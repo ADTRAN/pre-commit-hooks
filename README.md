@@ -9,6 +9,7 @@ Some out-of-the-box hooks for pre-commit.
 
 See also: https://github.com/pre-commit/pre-commit
 
+This is a fork of https://github.com/pre-commit/pre-commit-hooks modified for build reproducibility.
 
 ### Using pre-commit-hooks with pre-commit
 
