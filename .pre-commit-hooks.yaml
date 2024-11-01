@@ -192,3 +192,8 @@
     language: python
     types: [text]
     stages: [commit, push, manual]
+-   id: gitleaks-docker
+    name: Detect hardcoded secrets
+    description: Detect hardcoded secrets using Gitleaks
+    entry: artifactory.adtran.com/docker/gitleaks/gitleaks:v8.21.2 dir --verbose --redact
+    language: docker_image
