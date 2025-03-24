@@ -170,7 +170,7 @@
     name: forbid submodules
     description: forbids any submodules in the repository
     language: fail
-    entry: artifactory.adtran.com/docker/pre-commit-hooks:5.0.0-1 'submodules are not allowed in this repository:'
+    entry: 'submodules are not allowed in this repository:'
     types: [directory]
 -   id: mixed-line-ending
     name: mixed line ending
