@@ -1,24 +1,26 @@
 # Developing
 
+## Dependencies
+
+Remove any `install-requires` dependencies in `setup.cfg` and add/replace them
+in `requirements-dev.txt`.
+
 ## Installing
 
-You will need to install `tox` like this:
+You will need to install `tox` like this (if it is not already installed):
 
 ```
-python3 -m pip install --user tox
+./install-tox.sh
 ```
 
 ## Testing
 
-```
-tox -e pre-commit
-tox -e py36
-tox -e py37
-tox -e py38
-```
-
-## Update requirements in setup.cfg
+### Run All Tests
 
 ```
-tox -e py36-update-requirements
+./run-tests.sh
 ```
+
+### Run Specific Tests
+
+See the commands in `run-tests.sh` and run one or more of them manually.

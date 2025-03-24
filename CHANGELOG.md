@@ -1,3 +1,11 @@
+5.0.0.1 - 2025-03-24
+====================
+
+### Features
+
+- All hooks should be build reproducible
+- Add Adtran-specific `gitleaks-docker` hook
+
 5.0.0 - 2024-10-05
 ==================
 
