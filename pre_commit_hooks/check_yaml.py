@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import argparse
 from typing import Any
 from typing import Generator
 from typing import NamedTuple
-from typing import Optional
 from typing import Sequence
 
 import ruamel.yaml
@@ -10,7 +11,7 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ='safe')
 
 
-def _exhaust(gen: Generator[str, None, None]) -> None:
+def _exhaust(gen: Generator[str]) -> None:
     for _ in gen:
         pass
 
@@ -36,7 +37,7 @@ LOAD_FNS = {
 }
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-m', '--multi', '--allow-multiple-documents', action='store_true',
@@ -45,7 +46,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         '--unsafe', action='store_true',
         help=(
             'Instead of loading the files, simply parse them for syntax.  '
-            'A syntax-only check enables extensions and unsafe contstructs '
+            'A syntax-only check enables extensions and unsafe constructs '
             'which would otherwise be forbidden.  Using this option removes '
             'all guarantees of portability to other yaml implementations.  '
             'Implies --allow-multiple-documents'
@@ -68,4 +69,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import argparse
 import io
 import re
+import sys
 import tokenize
-from typing import List
-from typing import Optional
 from typing import Sequence
+
+if sys.version_info >= (3, 12):  # pragma: >=3.12 cover
+    FSTRING_START = tokenize.FSTRING_START
+    FSTRING_END = tokenize.FSTRING_END
+else:  # pragma: <3.12 cover
+    FSTRING_START = FSTRING_END = -1
 
 START_QUOTE_RE = re.compile('^[a-zA-Z]*"')
 
@@ -24,7 +31,7 @@ def handle_match(token_text: str) -> str:
         return token_text
 
 
-def get_line_offsets_by_line_no(src: str) -> List[int]:
+def get_line_offsets_by_line_no(src: str) -> list[int]:
     # Padded so we can index with line number
     offsets = [-1, 0]
     for line in src.splitlines(True):
@@ -40,11 +47,17 @@ def fix_strings(filename: str) -> int:
     # Basically a mutable string
     splitcontents = list(contents)
 
+    fstring_depth = 0
+
     # Iterate in reverse so the offsets are always correct
     tokens_l = list(tokenize.generate_tokens(io.StringIO(contents).readline))
     tokens = reversed(tokens_l)
     for token_type, token_text, (srow, scol), (erow, ecol), _ in tokens:
-        if token_type == tokenize.STRING:
+        if token_type == FSTRING_START:  # pragma: >=3.12 cover
+            fstring_depth += 1
+        elif token_type == FSTRING_END:  # pragma: >=3.12 cover
+            fstring_depth -= 1
+        elif fstring_depth == 0 and token_type == tokenize.STRING:
             new_text = handle_match(token_text)
             splitcontents[
                 line_offsets[srow] + scol:
@@ -60,7 +73,7 @@ def fix_strings(filename: str) -> int:
         return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*', help='Filenames to fix')
     args = parser.parse_args(argv)
@@ -77,4 +90,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

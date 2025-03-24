@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import argparse
-from typing import Optional
+import sys
 from typing import Sequence
 
-import toml
+if sys.version_info >= (3, 11):  # pragma: >=3.11 cover
+    import tomllib
+else:  # pragma: <3.11 cover
+    import tomli as tomllib
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*', help='Filenames to check.')
     args = parser.parse_args(argv)
@@ -13,12 +18,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     retval = 0
     for filename in args.filenames:
         try:
-            toml.load(filename)
-        except toml.TomlDecodeError as exc:
+            with open(filename, mode='rb') as fp:
+                tomllib.load(fp)
+        except tomllib.TOMLDecodeError as exc:
             print(f'{filename}: {exc}')
             retval = 1
     return retval
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

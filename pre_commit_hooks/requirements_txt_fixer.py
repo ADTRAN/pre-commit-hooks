@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import argparse
 import re
 from typing import IO
-from typing import List
-from typing import Optional
 from typing import Sequence
 
 
@@ -15,8 +15,8 @@ class Requirement:
     UNTIL_SEP = re.compile(rb'[^;\s]+')
 
     def __init__(self) -> None:
-        self.value: Optional[bytes] = None
-        self.comments: List[bytes] = []
+        self.value: bytes | None = None
+        self.comments: list[bytes] = []
 
     @property
     def name(self) -> bytes:
@@ -36,7 +36,7 @@ class Requirement:
 
         return name[:m.start()]
 
-    def __lt__(self, requirement: 'Requirement') -> bool:
+    def __lt__(self, requirement: Requirement) -> bool:
         # \n means top of file comment, so always return True,
         # otherwise just do a string comparison with value.
         assert self.value is not None, self.value
@@ -45,6 +45,11 @@ class Requirement:
         elif requirement.value == b'\n':
             return False
         else:
+            # if 2 requirements have the same name, the one with comments
+            # needs to go first (so that when removing duplicates, the one
+            # with comments is kept)
+            if self.name == requirement.name:
+                return bool(self.comments) > bool(requirement.comments)
             return self.name < requirement.name
 
     def is_complete(self) -> bool:
@@ -61,9 +66,9 @@ class Requirement:
 
 
 def fix_requirements(f: IO[bytes]) -> int:
-    requirements: List[Requirement] = []
+    requirements: list[Requirement] = []
     before = list(f)
-    after: List[bytes] = []
+    after: list[bytes] = []
 
     before_string = b''.join(before)
 
@@ -110,13 +115,20 @@ def fix_requirements(f: IO[bytes]) -> int:
     # which is automatically added by broken pip package under Debian
     requirements = [
         req for req in requirements
-        if req.value != b'pkg-resources==0.0.0\n'
+        if req.value not in [
+            b'pkg-resources==0.0.0\n',
+            b'pkg_resources==0.0.0\n',
+        ]
     ]
 
+    # sort the requirements and remove duplicates
+    prev = None
     for requirement in sorted(requirements):
         after.extend(requirement.comments)
         assert requirement.value, requirement.value
-        after.append(requirement.value)
+        if prev is None or requirement.value != prev.value:
+            after.append(requirement.value)
+            prev = requirement
     after.extend(rest)
 
     after_string = b''.join(after)
@@ -130,7 +142,7 @@ def fix_requirements(f: IO[bytes]) -> int:
         return FAIL
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*', help='Filenames to fix')
     args = parser.parse_args(argv)
@@ -150,4 +162,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

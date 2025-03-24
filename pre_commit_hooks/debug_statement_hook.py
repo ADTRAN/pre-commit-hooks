@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 import argparse
 import ast
 import traceback
-from typing import List
 from typing import NamedTuple
-from typing import Optional
 from typing import Sequence
 
 
 DEBUG_STATEMENTS = {
+    'bpdb',
     'ipdb',
     'pdb',
     'pdbr',
@@ -29,7 +30,7 @@ class Debug(NamedTuple):
 
 class DebugStatementParser(ast.NodeVisitor):
     def __init__(self) -> None:
-        self.breakpoints: List[Debug] = []
+        self.breakpoints: list[Debug] = []
 
     def visit_Import(self, node: ast.Import) -> None:
         for name in node.names:
@@ -65,12 +66,12 @@ def check_file(filename: str) -> int:
     visitor.visit(ast_obj)
 
     for bp in visitor.breakpoints:
-        print(f'{filename}:{bp.line}:{bp.col} - {bp.name} {bp.reason}')
+        print(f'{filename}:{bp.line}:{bp.col}: {bp.name} {bp.reason}')
 
     return int(bool(visitor.breakpoints))
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*', help='Filenames to run')
     args = parser.parse_args(argv)
@@ -82,4 +83,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

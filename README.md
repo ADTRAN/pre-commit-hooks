@@ -1,6 +1,5 @@
-[![Build Status](https://asottile.visualstudio.com/asottile/_apis/build/status/pre-commit.pre-commit-hooks?branchName=master)](https://asottile.visualstudio.com/asottile/_build/latest?definitionId=17&branchName=master)
-[![Azure DevOps coverage](https://img.shields.io/azure-devops/coverage/asottile/asottile/17/master.svg)](https://dev.azure.com/asottile/asottile/_build/latest?definitionId=17&branchName=master)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/pre-commit/pre-commit-hooks/master.svg)](https://results.pre-commit.ci/latest/github/pre-commit/pre-commit-hooks/master)
+[![build status](https://github.com/pre-commit/pre-commit-hooks/actions/workflows/main.yml/badge.svg)](https://github.com/pre-commit/pre-commit-hooks/actions/workflows/main.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/pre-commit/pre-commit-hooks/main.svg)](https://results.pre-commit.ci/latest/github/pre-commit/pre-commit-hooks/main)
 
 pre-commit-hooks
 ================
@@ -17,7 +16,7 @@ Add this to your `.pre-commit-config.yaml`
 
 ```yaml
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1  # Use the ref you want to point at
+    rev: v5.0.0  # Use the ref you want to point at
     hooks:
     -   id: trailing-whitespace
     # -   id: ...
@@ -53,11 +52,15 @@ Checks for a common error of placing code before the docstring.
 #### `check-executables-have-shebangs`
 Checks that non-binary executables have a proper shebang.
 
+#### `check-illegal-windows-names`
+Check for files that cannot be created on Windows.
+
 #### `check-json`
 Attempts to load all json files to verify syntax.
 
 #### `check-merge-conflict`
 Check for files that contain merge conflict strings.
+  - `--assume-in-merge` - Allows running the hook when there is no ongoing merge operation
 
 #### `check-shebang-scripts-are-executable`
 Checks that scripts with shebangs are executable.
@@ -114,20 +117,34 @@ This hook replaces double quoted strings with single quoted strings.
 #### `end-of-file-fixer`
 Makes sure files end in a newline and only a newline.
 
+#### `file-contents-sorter`
+Sort the lines in specified files (defaults to alphabetical).
+You must provide the target [`files`](https://pre-commit.com/#config-files) as input.
+Note that this hook WILL remove blank lines and does NOT respect any comments.
+All newlines will be converted to line feeds (`\n`).
+
+The following arguments are available:
+- `--ignore-case` - fold lower case to upper case characters.
+- `--unique` - ensure each line is unique.
+
 #### `fix-byte-order-marker`
 removes UTF-8 byte order marker
 
 #### `fix-encoding-pragma`
+
+_Deprecated since py2 is EOL - use [pyupgrade](https://github.com/asottile/pyupgrade) instead._
+
 Add `# -*- coding: utf-8 -*-` to the top of python files.
   - To remove the coding pragma pass `--remove` (useful in a python3-only codebase)
 
-#### `file-contents-sorter`
-Sort the lines in specified files (defaults to alphabetical).
-You must provide list of target files as input to it.
-Note that this hook WILL remove blank lines and does NOT respect any comments.
-
 #### `forbid-new-submodules`
 Prevent addition of new git submodules.
+
+This is intended as a helper to migrate away from submodules.  If you want to
+ban them entirely use `forbid-submodules`
+
+#### `forbid-submodules`
+forbids any submodules in the repository.
 
 #### `mixed-line-ending`
 Replaces or checks mixed line ending.
@@ -138,13 +155,15 @@ Replaces or checks mixed line ending.
       - `no` - Checks if there is any mixed line ending without modifying any file.
 
 #### `name-tests-test`
-Assert that files in tests/ end in `_test.py`.
-  - Use `args: ['--django']` to match `test*.py` instead.
+verifies that test files are named correctly.
+- `--pytest` (the default): ensure tests match `.*_test\.py`
+- `--pytest-test-first`: ensure tests match `test_.*\.py`
+- `--django` / `--unittest`: ensure tests match `test.*\.py`
 
 #### `no-commit-to-branch`
 Protect specific branches from direct checkins.
-  - Use `args: [--branch, staging, --branch, master]` to set the branch.
-    Both `master` and `main` are protected by default if no branch argument is set.
+  - Use `args: [--branch, staging, --branch, main]` to set the branch.
+    Both `main` and `master` are protected by default if no branch argument is set.
   - `-b` / `--branch` may be specified multiple times to protect multiple
     branches.
   - `-p` / `--pattern` can be used to protect branches that match a supplied regex
@@ -168,7 +187,7 @@ the following commandline options:
   - `--top-keys comma,separated,keys` - Keys to keep at the top of mappings.
 
 #### `requirements-txt-fixer`
-Sorts entries in requirements.txt and removes incorrect entry for `pkg-resources==0.0.0`
+Sorts entries in requirements.txt and constraints.txt and removes incorrect entry for `pkg-resources==0.0.0`
 
 #### `sort-simple-yaml`
 Sorts simple YAML files which consist only of top-level

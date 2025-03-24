@@ -1,24 +1,33 @@
+from __future__ import annotations
+
 import argparse
-import json
 import math
 import os
-from typing import Optional
+import subprocess
 from typing import Sequence
-from typing import Set
 
 from pre_commit_hooks.util import added_files
-from pre_commit_hooks.util import CalledProcessError
-from pre_commit_hooks.util import cmd_output
+from pre_commit_hooks.util import zsplit
 
 
-def lfs_files() -> Set[str]:
-    try:
-        # Introduced in git-lfs 2.2.0, first working in 2.2.1
-        lfs_ret = cmd_output('git', 'lfs', 'status', '--json')
-    except CalledProcessError:  # pragma: no cover (with git-lfs)
-        lfs_ret = '{"files":{}}'
+def filter_lfs_files(filenames: set[str]) -> None:  # pragma: no cover (lfs)
+    """Remove files tracked by git-lfs from the set."""
+    if not filenames:
+        return
 
-    return set(json.loads(lfs_ret)['files'])
+    check_attr = subprocess.run(
+        ('git', 'check-attr', 'filter', '-z', '--stdin'),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        encoding='utf-8',
+        check=True,
+        input='\0'.join(filenames),
+    )
+    stdout = zsplit(check_attr.stdout)
+    for i in range(0, len(stdout), 3):
+        filename, filter_tag = stdout[i], stdout[i + 2]
+        if filter_tag == 'lfs':
+            filenames.remove(filename)
 
 
 def find_large_added_files(
@@ -30,12 +39,14 @@ def find_large_added_files(
     # Find all added files that are also in the list of files pre-commit tells
     # us about
     retv = 0
-    filenames_filtered = set(filenames) - lfs_files()
+    filenames_filtered = set(filenames)
+    filter_lfs_files(filenames_filtered)
+
     if not enforce_all:
         filenames_filtered &= added_files()
 
     for filename in filenames_filtered:
-        kb = int(math.ceil(os.stat(filename).st_size / 1024))
+        kb = math.ceil(os.stat(filename).st_size / 1024)
         if kb > maxkb:
             print(f'{filename} ({kb} KB) exceeds {maxkb} KB.')
             retv = 1
@@ -43,7 +54,7 @@ def find_large_added_files(
     return retv
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'filenames', nargs='*',
@@ -55,7 +66,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument(
         '--maxkb', type=int, default=500,
-        help='Maxmimum allowable KB for added files',
+        help='Maximum allowable KB for added files',
     )
     args = parser.parse_args(argv)
 
@@ -67,4 +78,4 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    exit(main())
+    raise SystemExit(main())

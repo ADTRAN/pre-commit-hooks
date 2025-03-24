@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import shutil
 
@@ -78,6 +80,24 @@ def test_autofix_main(tmpdir):
     # file was formatted (shouldn't trigger linter again)
     ret = main([str(srcfile)])
     assert ret == 0
+
+
+def test_invalid_main(tmpdir):
+    srcfile1 = tmpdir.join('not_valid_json.json')
+    srcfile1.write(
+        '{\n'
+        '  // not json\n'
+        '  "a": "b"\n'
+        '}',
+    )
+    srcfile2 = tmpdir.join('to_be_json_formatted.json')
+    srcfile2.write('{ "a": "b" }')
+
+    # it should have skipped the first file and formatted the second one
+    assert main(['--autofix', str(srcfile1), str(srcfile2)]) == 1
+
+    # confirm second file was formatted (shouldn't trigger linter again)
+    assert main([str(srcfile2)]) == 0
 
 
 def test_orderfile_get_pretty_format():

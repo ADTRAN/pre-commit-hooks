@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pre_commit_hooks.tests_should_end_in_test import main
 
 
@@ -41,3 +43,8 @@ def test_main_not_django_fails():
 def test_main_django_fails():
     ret = main(['--django', 'foo_test.py', 'test_bar.py', 'test_baz.py'])
     assert ret == 1
+
+
+def test_main_pytest_test_first():
+    assert main(['--pytest-test-first', 'test_foo.py']) == 0
+    assert main(['--pytest-test-first', 'foo_test.py']) == 1

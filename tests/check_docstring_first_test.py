@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from pre_commit_hooks.check_docstring_first import check_docstring_first
@@ -15,7 +17,7 @@ TESTS = (
         b'from __future__ import unicode_literals\n'
         b'"foo"\n',
         1,
-        '{filename}:2 Module docstring appears after code '
+        '{filename}:2: Module docstring appears after code '
         '(code seen on line 1).\n',
     ),
     # Test double docstring
@@ -24,7 +26,7 @@ TESTS = (
         b'from __future__ import absolute_import\n'
         b'"fake docstring"\n',
         1,
-        '{filename}:3 Multiple module docstrings '
+        '{filename}:3: Multiple module docstrings '
         '(first docstring on line 1).\n',
     ),
     # Test multiple lines of code above
@@ -33,7 +35,7 @@ TESTS = (
         b'import sys\n'
         b'"docstring"\n',
         1,
-        '{filename}:3 Module docstring appears after code '
+        '{filename}:3: Module docstring appears after code '
         '(code seen on line 1).\n',
     ),
     # String literals in expressions are ok.

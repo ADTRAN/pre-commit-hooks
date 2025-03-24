@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import shutil
 
 import pytest
@@ -85,10 +87,9 @@ xfailif_no_gitlfs = pytest.mark.xfail(
 
 
 @xfailif_no_gitlfs
-def test_allows_gitlfs(temp_git_dir, monkeypatch):  # pragma: no cover
+def test_allows_gitlfs(temp_git_dir):  # pragma: no cover
     with temp_git_dir.as_cwd():
-        monkeypatch.setenv('HOME', str(temp_git_dir))
-        cmd_output('git', 'lfs', 'install')
+        cmd_output('git', 'lfs', 'install', '--local')
         temp_git_dir.join('f.py').write('a' * 10000)
         cmd_output('git', 'lfs', 'track', 'f.py')
         cmd_output('git', 'add', '--', '.')
@@ -97,10 +98,9 @@ def test_allows_gitlfs(temp_git_dir, monkeypatch):  # pragma: no cover
 
 
 @xfailif_no_gitlfs
-def test_moves_with_gitlfs(temp_git_dir, monkeypatch):  # pragma: no cover
+def test_moves_with_gitlfs(temp_git_dir):  # pragma: no cover
     with temp_git_dir.as_cwd():
-        monkeypatch.setenv('HOME', str(temp_git_dir))
-        cmd_output('git', 'lfs', 'install')
+        cmd_output('git', 'lfs', 'install', '--local')
         cmd_output('git', 'lfs', 'track', 'a.bin', 'b.bin')
         # First add the file we're going to move
         temp_git_dir.join('a.bin').write('a' * 10000)
@@ -112,12 +112,23 @@ def test_moves_with_gitlfs(temp_git_dir, monkeypatch):  # pragma: no cover
 
 
 @xfailif_no_gitlfs
-def test_enforce_allows_gitlfs(temp_git_dir, monkeypatch):  # pragma: no cover
+def test_enforce_allows_gitlfs(temp_git_dir):  # pragma: no cover
     with temp_git_dir.as_cwd():
-        monkeypatch.setenv('HOME', str(temp_git_dir))
-        cmd_output('git', 'lfs', 'install')
+        cmd_output('git', 'lfs', 'install', '--local')
         temp_git_dir.join('f.py').write('a' * 10000)
         cmd_output('git', 'lfs', 'track', 'f.py')
         cmd_output('git', 'add', '--', '.')
+        # With --enforce-all large files on git lfs should succeed
+        assert main(('--enforce-all', '--maxkb', '9', 'f.py')) == 0
+
+
+@xfailif_no_gitlfs
+def test_enforce_allows_gitlfs_after_commit(temp_git_dir):  # pragma: no cover
+    with temp_git_dir.as_cwd():
+        cmd_output('git', 'lfs', 'install', '--local')
+        temp_git_dir.join('f.py').write('a' * 10000)
+        cmd_output('git', 'lfs', 'track', 'f.py')
+        cmd_output('git', 'add', '--', '.')
+        git_commit('-am', 'foo')
         # With --enforce-all large files on git lfs should succeed
         assert main(('--enforce-all', '--maxkb', '9', 'f.py')) == 0

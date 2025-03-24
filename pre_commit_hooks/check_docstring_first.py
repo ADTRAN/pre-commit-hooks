@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import argparse
 import io
 import tokenize
 from tokenize import tokenize as tokenize_tokenize
-from typing import Optional
 from typing import Sequence
 
 NON_CODE_TOKENS = frozenset((
@@ -27,13 +28,13 @@ def check_docstring_first(src: bytes, filename: str = '<unknown>') -> int:
         if tok_type == tokenize.STRING and scol == 0:
             if found_docstring_line is not None:
                 print(
-                    f'{filename}:{sline} Multiple module docstrings '
+                    f'{filename}:{sline}: Multiple module docstrings '
                     f'(first docstring on line {found_docstring_line}).',
                 )
                 return 1
             elif found_code_line is not None:
                 print(
-                    f'{filename}:{sline} Module docstring appears after code '
+                    f'{filename}:{sline}: Module docstring appears after code '
                     f'(code seen on line {found_code_line}).',
                 )
                 return 1
@@ -45,7 +46,7 @@ def check_docstring_first(src: bytes, filename: str = '<unknown>') -> int:
     return 0
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*')
     args = parser.parse_args(argv)

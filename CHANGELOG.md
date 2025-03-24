@@ -1,3 +1,148 @@
+5.0.0 - 2024-10-05
+==================
+
+### Features
+- `requirements-txt-fixer`: also remove `pkg_resources==...`.
+    - #850 PR by @ericfrederich.
+    - #1030 issue by @ericfrederich.
+- `check-illegal-windows-names`: new hook!
+    - #1044 PR by @ericfrederich.
+    - #589 issue by @ericfrederich.
+    - #1049 PR by @Jeffrey-Lim.
+- `pretty-format-json`: continue processing even if a file has a json error.
+    - #1039 PR by @amarvin.
+    - #1038 issue by @amarvin.
+
+### Fixes
+- `destroyed-symlinks`: set `stages` to `[pre-commit, pre-push, manual]`
+    - PR #1085 by @AdrianDC.
+
+### Migrating
+- pre-commit-hooks now requires `pre-commit>=3.2.0`.
+- use non-deprecated names for `stages`.
+    - #1093 PR by @asottile.
+
+4.6.0 - 2024-04-06
+==================
+
+### Features
+- `requirements-txt-fixer`: remove duplicate packages.
+    - #1014 PR by @vhoulbreque-withings.
+    - #960 issue @csibe17.
+
+### Migrating
+- `fix-encoding-pragma`: deprecated -- will be removed in 5.0.0.  use
+  [pyupgrade](https://github.com/asottile/pyupgrade) or some other tool.
+    - #1033 PR by @mxr.
+    - #1032 issue by @mxr.
+
+4.5.0 - 2023-10-07
+==================
+
+### Features
+- `requirements-txt-fixer`: also sort `constraints.txt` by default.
+    - #857 PR by @lev-blit.
+    - #830 issue by @PLPeeters.
+- `debug-statements`: add `bpdb` debugger.
+    - #942 PR by @mwip.
+    - #941 issue by @mwip.
+
+### Fixes
+- `file-contents-sorter`: fix sorting an empty file.
+    - #944 PR by @RoelAdriaans.
+    - #935 issue by @paduszyk.
+- `double-quote-string-fixer`: don't rewrite inside f-strings in 3.12+.
+    - #973 PR by @asottile.
+    - #971 issue by @XuehaiPan.
+
+## Migrating
+- now requires python >= 3.8.
+    - #926 PR by @asottile.
+    - #927 PR by @asottile.
+
+4.4.0 - 2022-11-23
+==================
+
+### Features
+- `forbid-submodules`: new hook which outright bans submodules.
+    - #815 PR by @asottile.
+    - #707 issue by @ChiefGokhlayeh.
+
+4.3.0 - 2022-06-07
+==================
+
+### Features
+- `check-executables-have-shebangs`: use `git config core.fileMode` to
+  determine if it should query `git`.
+    - #730 PR by @Kurt-von-Laven.
+- `name-tests-test`: add `--pytest-test-first` test convention.
+    - #779 PR by @asottile.
+
+### Fixes
+- `check-shebang-scripts-are-executable`: update windows instructions.
+    - #774 PR by @mdeweerd.
+    - #770 issue by @mdeweerd.
+- `check-toml`: use stdlib `tomllib` when available.
+    - #771 PR by @DanielNoord.
+    - #755 issue by @sognetic.
+- `check-added-large-files`: don't run on non-file `stages`.
+    - #778 PR by @asottile.
+    - #777 issue by @skyj.
+
+4.2.0 - 2022-04-06
+==================
+
+### Features
+- `name-tests-test`: updated display text.
+    - #713 PR by @asottile.
+- `check-docstring-first`: make output more parsable.
+    - #748 PR by @asottile.
+- `check-merge-conflict`: make output more parsable.
+    - #748 PR by @asottile.
+- `debug-statements`: make output more parsable.
+    - #748 PR by @asottile.
+
+### Fixes
+- `check-merge-conflict`: fix detection of `======` conflict marker on windows.
+    - #748 PR by @asottile.
+
+### Updating
+- Drop python<3.7.
+    - #719 PR by @asottile.
+- Changed default branch from `master` to `main`.
+    - #744 PR by @asottile.
+
+4.1.0 - 2021-12-22
+==================
+
+### Features
+- `debug-statements`: add `pdbr` debugger.
+    - #614 PR by @cansarigol.
+- `detect-private-key`: add detection for additional key types.
+    - #658 PR by @ljmf00.
+- `check-executables-have-shebangs`: improve messaging on windows.
+    - #689 PR by @pujitm.
+    - #686 issue by @jmerdich.
+- `check-added-large-files`: support `--enforce-all` with `git-lfs`.
+    - #674 PR by @amartani.
+    - #560 issue by @jeremy-coulon.
+
+### Fixes
+- `check-case-conflict`: improve performance.
+    - #626 PR by @guykisel.
+    - #625 issue by @guykisel.
+- `forbid-new-submodules`: fix false-negatives for `pre-push`.
+    - #619 PR by @m-khvoinitsky.
+    - #609 issue by @m-khvoinitsky.
+- `check-merge-conflict`: fix execution in git worktrees.
+    - #662 PR by @errsyn.
+    - #638 issue by @daschuer.
+
+### Misc.
+- Normalize case of hook names and descriptions.
+    - #671 PR by @dennisroche.
+    - #673 PR by @revolter.
+
 4.0.1 - 2021-05-16
 ==================
 
