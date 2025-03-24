@@ -44,7 +44,7 @@
     minimum_pre_commit_version: 3.2.0
 -   id: check-illegal-windows-names
     name: check illegal windows names
-    entry: artifactory.adtran.com/docker/pre-commit-hooks:5.0.0-1 Illegal Windows filenames detected
+    entry: Illegal Windows filenames detected
     language: fail
     files: '(?i)((^|/)(CON|PRN|AUX|NUL|COM[\d¹²³]|LPT[\d¹²³])(\.|/|$)|[<>:\"\\|?*\x00-\x1F]|/[^/]*[\.\s]/|[^/]*[\.\s]$)'
 -   id: check-json

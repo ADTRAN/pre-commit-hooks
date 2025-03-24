@@ -2,7 +2,7 @@
 
 ## Dependencies
 
-Remove any `install-requires` dependencies in `setup.cfg` and add/replace them
+Remove any `install_requires` dependencies in `setup.cfg` and add/replace them
 in `requirements-dev.txt`.
 
 ## Installing
