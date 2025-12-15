@@ -111,6 +111,14 @@ The following arguments are available:
 #### `detect-private-key`
 Checks for the existence of private keys.
 
+#### `detect-non-ascii-characters`
+Detects and strips non-printable, non-ASCII bytes (supply-chain safety guard).
+  - Default allowed range: printable ASCII (`0x20-0x7E`) plus `\n`, `\r`, and `\t`.
+  - `--include-range RANGE` - override allowed byte ranges (comma-separated, decimal or hex, supports `START-END`). Can be repeated.
+  - `--allow-chars TEXT` - permit additional characters (adds their UTF-8 bytes to the allowed set). Can be repeated.
+  - `--files-glob GLOB` - optional fnmatch-style glob to further restrict the provided file list (by default, the hook processes all files handed to it by pre-commit).
+  - `--check-only` - report disallowed bytes without modifying files.
+
 #### `double-quote-string-fixer`
 This hook replaces double quoted strings with single quoted strings.
 
