@@ -128,9 +128,10 @@ def test_combined_parameters(tmp_path, capsys):
     f2 = tmp_path / 'emoji.txt'
     f3 = tmp_path / 'bidi.txt'
     f4 = tmp_path / 'mix.txt'
-    f1.write_text('café\n')
-    f2.write_text('smile 🪱\n')
-    f3.write_text('abc\u202e\n')
+    # use explicit UTF-8 to support Windows locales without UTF-8 defaults
+    f1.write_bytes(b'caf\xc3\xa9\n')
+    f2.write_bytes(b'smile \xc2\xa3\n')
+    f3.write_bytes(b'abc\xe2\x80\xae\n')
     f4.write_bytes(b'abc\x01\x80\n')
 
     ret = main([
@@ -147,8 +148,8 @@ def test_combined_parameters(tmp_path, capsys):
     assert f4.name in out and 'disallowed bytes' in out
     assert ret == 1
 
-    f2.write_text('smile 🪱\n')
-    f3.write_text('abc\u202e\n')
+    f2.write_bytes(b'smile \xc2\xa3\n')
+    f3.write_bytes(b'abc\xe2\x80\xae\n')
     f4.write_bytes(b'abc\x01\x80\n')
     ret2 = main([
         '--files-glob', '*.txt',
@@ -157,9 +158,9 @@ def test_combined_parameters(tmp_path, capsys):
         str(f1), str(f2), str(f3), str(f4)
     ])
     out2 = capsys.readouterr().out
-    assert f1.read_text() == 'café\n'
-    assert '🪱' not in f2.read_text()
-    assert '\u202e' not in f3.read_text() and '\u202e'.encode('utf-8') not in f3.read_bytes()
+    assert f1.read_bytes().decode('utf-8') == 'café\n'
+    assert '£' not in f2.read_bytes().decode('utf-8')
+    assert '\u202e' not in f3.read_bytes().decode('utf-8') and b'\xe2\x80\xae' not in f3.read_bytes()
     assert f4.read_bytes() == b'abc\n'
     # All files except f1 should be mentioned in output
     assert f2.name in out2 and f3.name in out2 and f4.name in out2
