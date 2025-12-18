@@ -1,5 +1,9 @@
 from __future__ import annotations
+
 import shutil
+
+import pytest
+
 from pre_commit_hooks.non_ascii_guard import main
 from testing.util import get_resource_path
 
@@ -165,3 +169,37 @@ def test_combined_parameters(tmp_path, capsys):
     # All files except f1 should be mentioned in output
     assert f2.name in out2 and f3.name in out2 and f4.name in out2
     assert ret2 == 1
+
+
+def test_include_range_ignores_empty_parts(tmp_path):
+    path = tmp_path / 'bytes.bin'
+    path.write_bytes(b'\x01\x02')
+
+    ret = main(['--include-range', '1,,2', str(path)])
+
+    assert ret == 0
+    assert path.read_bytes() == b'\x01\x02'
+
+
+def test_invalid_include_range_token_exits(tmp_path):
+    path = tmp_path / 'file.txt'
+    path.write_text('ok')
+
+    with pytest.raises(SystemExit):
+        main(['--include-range', '0xZZ', str(path)])
+
+
+def test_out_of_range_byte_exits(tmp_path):
+    path = tmp_path / 'file.txt'
+    path.write_text('ok')
+
+    with pytest.raises(SystemExit):
+        main(['--include-range', '0x1FF', str(path)])
+
+
+def test_descending_range_exits(tmp_path):
+    path = tmp_path / 'file.txt'
+    path.write_text('ok')
+
+    with pytest.raises(SystemExit):
+        main(['--include-range', '10-5', str(path)])

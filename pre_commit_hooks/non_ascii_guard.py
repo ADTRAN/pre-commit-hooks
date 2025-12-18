@@ -119,13 +119,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             continue
 
         new_data = bytes(b for b in data if b in allowed)
-        if new_data != data:
-            with open(filename, 'wb') as f:
-                f.write(new_data)
-            print(
-                f'Fixing {filename}: ' f'disallowed bytes {_format_offenders(offenders)}',
-            )
-            retv = 1
+        with open(filename, 'wb') as f:
+            f.write(new_data)
+        print(
+            f'Fixing {filename}: ' f'disallowed bytes {_format_offenders(offenders)}',
+        )
+        retv = 1
     return retv
 
 
