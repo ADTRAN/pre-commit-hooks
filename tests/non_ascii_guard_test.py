@@ -4,6 +4,7 @@ import shutil
 
 import pytest
 
+from pre_commit_hooks.non_ascii_guard import _cluster_allowed_visible_plus
 from pre_commit_hooks.non_ascii_guard import MODE_ASCII_ONLY
 from pre_commit_hooks.non_ascii_guard import MODE_BALANCED
 from pre_commit_hooks.non_ascii_guard import MODE_VISIBLE_PLUS
@@ -290,3 +291,36 @@ def test_descending_range_exits(tmp_path):
 
     with pytest.raises(SystemExit):
         main(['--include-range', '10-5', str(path)])
+
+
+def test_visible_plus_blocks_bidi_in_cluster(tmp_path, capsys):
+    """Test line 107: bidi override check in _cluster_allowed_visible_plus"""
+    path = tmp_path / 'bidi.txt'
+    # Emoji followed by bidi override U+202E (RIGHT-TO-LEFT OVERRIDE)
+    path.write_text('test😀\u202Eword', encoding='utf-8')
+
+    ret = main(['--mode', MODE_VISIBLE_PLUS, '--check-only', str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'disallowed bytes' in out
+
+
+def test_visible_plus_blocks_control_in_cluster(tmp_path, capsys):
+    """Test line 109: control character check in _cluster_allowed_visible_plus"""
+    path = tmp_path / 'ctrl.txt'
+    # Emoji followed by control char U+0001 (not tab/LF/CR)
+    path.write_text('test😀\x01word', encoding='utf-8')
+
+    ret = main(['--mode', MODE_VISIBLE_PLUS, '--check-only', str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'disallowed bytes' in out
+
+
+def test_visible_plus_allows_pure_ascii():
+    """Test line 112: early return for ASCII-only clusters in visible-plus"""
+    # Direct unit test of _cluster_allowed_visible_plus with ASCII-only input
+    ascii_cps = [ord(c) for c in 'hello']
+    assert _cluster_allowed_visible_plus(ascii_cps) is True
