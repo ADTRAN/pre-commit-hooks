@@ -227,10 +227,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         with open(filename, 'rb') as f:
             data = f.read()
 
-        try:
-            text = data.decode('utf-8', errors='surrogateescape')
-        except UnicodeDecodeError:
-            text = data.decode('utf-8', errors='ignore')
+        text = data.decode('utf-8', errors='surrogateescape')
 
         offenders: list[tuple[int, int]] = []
         new_chunks: list[bytes] = []

@@ -242,6 +242,22 @@ def test_files_include_and_exclude(tmp_path):
     assert keep.read_text(encoding='utf-8') == 'ok café'
 
 
+def test_include_range_restricts_even_if_mode_allows(tmp_path, capsys):
+    path = tmp_path / 'range.txt'
+    path.write_text('hello 😀', encoding='utf-8')
+
+    ret = main([
+        '--mode', MODE_VISIBLE_PLUS,
+        '--include-range', '0x20-0x7E',  # ASCII only
+        str(path),
+    ])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'disallowed bytes' in out
+    assert 'range.txt' in out
+
+
 def test_include_range_ignores_empty_parts(tmp_path):
     path = tmp_path / 'bytes.bin'
     path.write_bytes(b'\x01\x02')
