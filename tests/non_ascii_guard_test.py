@@ -127,7 +127,7 @@ def test_fixture_file_is_cleaned(tmp_path, capsys) -> None:
     ret = main([str(path)])
 
     assert ret == 1
-    assert path.read_text() == 'ASCII ok\nHas ctrl:\nUnicode: café\n'
+    assert path.read_text(encoding='utf-8') == 'ASCII ok\nHas ctrl:\nUnicode: café\n'
     out = capsys.readouterr().out
     assert f'Fixing {path}: disallowed bytes ' in out
 
@@ -178,7 +178,7 @@ def test_combined_parameters(tmp_path, capsys):
 
 def test_mode_visible_plus_allows_emoji_blocks_accents(tmp_path, capsys):
     path = tmp_path / 'emoji.txt'
-    path.write_text('hi 😀 é')
+    path.write_text('hi 😀 é', encoding='utf-8')
 
     ret = main(['--mode', MODE_VISIBLE_PLUS, '--check-only', str(path)])
 
@@ -190,7 +190,7 @@ def test_mode_visible_plus_allows_emoji_blocks_accents(tmp_path, capsys):
 
 def test_mode_ascii_only_is_strict(tmp_path, capsys):
     path = tmp_path / 'strict.txt'
-    path.write_text('hi café 😀')
+    path.write_text('hi café 😀', encoding='utf-8')
 
     ret = main(['--mode', MODE_ASCII_ONLY, '--check-only', str(path)])
 
@@ -213,7 +213,7 @@ def test_mode_balanced_allows_latin1_blocks_bidi(tmp_path, capsys):
 
 def test_zwj_emoji_blocked_as_cluster(tmp_path, capsys):
     path = tmp_path / 'family.txt'
-    path.write_text('family: 👨\u200d👩\u200d👧\u200d👦 end')
+    path.write_text('family: 👨\u200d👩\u200d👧\u200d👦 end', encoding='utf-8')
 
     ret = main(['--mode', MODE_VISIBLE_PLUS, str(path)])
 
@@ -221,14 +221,14 @@ def test_zwj_emoji_blocked_as_cluster(tmp_path, capsys):
     out = capsys.readouterr().out
     assert 'Fixing' in out
     assert 'family.txt' in out
-    assert '\u200d' not in path.read_text()
+    assert '\u200d' not in path.read_text(encoding='utf-8')
 
 
 def test_files_include_and_exclude(tmp_path):
     keep = tmp_path / 'skip.md'
     take = tmp_path / 'scan.py'
-    keep.write_text('ok café')
-    take.write_text('hi café')
+    keep.write_text('ok café', encoding='utf-8')
+    take.write_text('hi café', encoding='utf-8')
 
     ret = main([
         '--mode', MODE_VISIBLE_PLUS,
@@ -238,8 +238,8 @@ def test_files_include_and_exclude(tmp_path):
     ])
 
     assert ret == 1
-    assert 'café' not in take.read_text()
-    assert keep.read_text() == 'ok café'
+    assert 'café' not in take.read_text(encoding='utf-8')
+    assert keep.read_text(encoding='utf-8') == 'ok café'
 
 
 def test_include_range_ignores_empty_parts(tmp_path):
