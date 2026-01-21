@@ -113,10 +113,19 @@ Checks for the existence of private keys.
 
 #### `detect-non-ascii-characters`
 Detects and strips non-printable, non-ASCII bytes (supply-chain safety guard).
-  - Default allowed range: printable ASCII (`0x20-0x7E`) plus `\n`, `\r`, and `\t`.
+  - Modes (choose via `--mode`):
+    - `balanced` (default): allow ASCII + Latin-1 accents/symbols; block controls/null, bidi overrides (U+202A–U+202E, U+2066–U+2069), and zero-width characters (U+200B–U+200D).
+    - `visible-plus`: allow ASCII + emoji (U+1F600–U+1F64F and modifiers/VS16), still blocking zero-width joiners, bidi, and controls.
+    - `ascii-only`: allow only tab/lf/cr and `0x20-0x7E`; block everything else.
+    - Examples: `--mode balanced` (default); `--mode visible-plus` (allow 😀, 🚀, etc. but still block zero-width joiners); `--mode ascii-only` (paranoid mode, blocks all non-ASCII).
   - `--include-range RANGE` - override allowed byte ranges (comma-separated, decimal or hex, supports `START-END`). Can be repeated.
+    - Examples: `--include-range 0x09,0x0A,0x0D,0x20-0x7E` (default printable ASCII); `--include-range 0-255` (allow all bytes); `--include-range 0x20-0x7E,0xA0` (allow NBSP too).
   - `--allow-chars TEXT` - permit additional characters (adds their UTF-8 bytes to the allowed set). Can be repeated.
+    - Examples: `--allow-chars "é"` (allow a single accent); `--allow-chars "😀"` (allow an emoji); `--allow-chars "👨‍👩‍👧‍👦"` (allow a grapheme cluster with ZWJ).
   - `--files-glob GLOB` - optional fnmatch-style glob to further restrict the provided file list (by default, the hook processes all files handed to it by pre-commit).
+    - Example: `--files-glob "*.py"` (only consider .py files from the passed list).
+  - `--files-include GLOB` / `--files-exclude GLOB` - additional fnmatch-style filters applied after `--files-glob`.
+    - Examples: `--files-include "*.md"` (only Markdown); `--files-exclude "vendor/*"` (skip vendored files).
   - `--check-only` - report disallowed bytes without modifying files.
 
 #### `double-quote-string-fixer`

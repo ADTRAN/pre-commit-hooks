@@ -4,6 +4,9 @@ import shutil
 
 import pytest
 
+from pre_commit_hooks.non_ascii_guard import MODE_ASCII_ONLY
+from pre_commit_hooks.non_ascii_guard import MODE_BALANCED
+from pre_commit_hooks.non_ascii_guard import MODE_VISIBLE_PLUS
 from pre_commit_hooks.non_ascii_guard import main
 from testing.util import get_resource_path
 
@@ -54,10 +57,10 @@ def test_include_range_allows_bytes(tmp_path) -> None:
 
 def test_allow_chars_adds_utf8_bytes(tmp_path) -> None:
     path = tmp_path / 'text.txt'
-    content = 'café\n'.encode('utf-8')
+    content = 'Ωmega\n'.encode('utf-8')
     path.write_bytes(content)
 
-    ret = main(['--allow-chars', 'é', str(path)])
+    ret = main(['--allow-chars', 'Ω', str(path)])
 
     assert ret == 0
     assert path.read_bytes() == content
@@ -78,7 +81,8 @@ def test_reports_positions_for_multibyte_chars(tmp_path, capsys) -> None:
 
     assert ret == 1
     out = capsys.readouterr().out
-    assert 'disallowed bytes 0xc3@1, 0xa9@2, 0xce@3, 0xa9@4, 0xe2@5' in out
+    # Balanced allows é, so first offenders start at Ω (0xce@3)
+    assert 'disallowed bytes 0xce@3, 0xa9@4, 0xe2@5' in out
 
 
 def test_printable_offender_shows_char(tmp_path, capsys) -> None:
@@ -123,7 +127,7 @@ def test_fixture_file_is_cleaned(tmp_path, capsys) -> None:
     ret = main([str(path)])
 
     assert ret == 1
-    assert path.read_text() == 'ASCII ok\nHas ctrl:\nUnicode: caf\n'
+    assert path.read_text() == 'ASCII ok\nHas ctrl:\nUnicode: café\n'
     out = capsys.readouterr().out
     assert f'Fixing {path}: disallowed bytes ' in out
 
@@ -139,6 +143,7 @@ def test_combined_parameters(tmp_path, capsys):
     f4.write_bytes(b'abc\x01\x80\n')
 
     ret = main([
+        '--mode', MODE_BALANCED,
         '--files-glob', '*.txt',
         '--allow-chars', 'é',
         '--include-range', '0x0A,0x20-0x7E',
@@ -146,16 +151,17 @@ def test_combined_parameters(tmp_path, capsys):
         str(f1), str(f2), str(f3), str(f4)
     ])
     out = capsys.readouterr().out
-    assert f1.name not in out
-    assert f2.name in out and 'disallowed bytes' in out
-    assert f3.name in out and 'disallowed bytes' in out
-    assert f4.name in out and 'disallowed bytes' in out
+    assert f1.name not in out  # café allowed in balanced
+    assert f2.name in out and 'disallowed bytes' in out  # £ not allowed
+    assert f3.name in out and 'disallowed bytes' in out  # bidi
+    assert f4.name in out and 'disallowed bytes' in out  # controls
     assert ret == 1
 
     f2.write_bytes(b'smile \xc2\xa3\n')
     f3.write_bytes(b'abc\xe2\x80\xae\n')
     f4.write_bytes(b'abc\x01\x80\n')
     ret2 = main([
+        '--mode', MODE_BALANCED,
         '--files-glob', '*.txt',
         '--allow-chars', 'é',
         '--include-range', '0x0A,0x20-0x7E',
@@ -166,9 +172,74 @@ def test_combined_parameters(tmp_path, capsys):
     assert '£' not in f2.read_bytes().decode('utf-8')
     assert '\u202e' not in f3.read_bytes().decode('utf-8') and b'\xe2\x80\xae' not in f3.read_bytes()
     assert f4.read_bytes() == b'abc\n'
-    # All files except f1 should be mentioned in output
     assert f2.name in out2 and f3.name in out2 and f4.name in out2
     assert ret2 == 1
+
+
+def test_mode_visible_plus_allows_emoji_blocks_accents(tmp_path, capsys):
+    path = tmp_path / 'emoji.txt'
+    path.write_text('hi 😀 é')
+
+    ret = main(['--mode', MODE_VISIBLE_PLUS, '--check-only', str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert path.name in out
+    assert 'disallowed bytes' in out  # accent is blocked
+
+
+def test_mode_ascii_only_is_strict(tmp_path, capsys):
+    path = tmp_path / 'strict.txt'
+    path.write_text('hi café 😀')
+
+    ret = main(['--mode', MODE_ASCII_ONLY, '--check-only', str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'disallowed bytes' in out
+
+
+def test_mode_balanced_allows_latin1_blocks_bidi(tmp_path, capsys):
+    path = tmp_path / 'latin1.txt'
+    path.write_bytes('café \u202e'.encode('utf-8'))
+
+    ret = main(['--mode', MODE_BALANCED, '--check-only', str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'disallowed bytes' in out
+    assert 'latin1.txt' in out
+
+
+def test_zwj_emoji_blocked_as_cluster(tmp_path, capsys):
+    path = tmp_path / 'family.txt'
+    path.write_text('family: 👨\u200d👩\u200d👧\u200d👦 end')
+
+    ret = main(['--mode', MODE_VISIBLE_PLUS, str(path)])
+
+    assert ret == 1
+    out = capsys.readouterr().out
+    assert 'Fixing' in out
+    assert 'family.txt' in out
+    assert '\u200d' not in path.read_text()
+
+
+def test_files_include_and_exclude(tmp_path):
+    keep = tmp_path / 'skip.md'
+    take = tmp_path / 'scan.py'
+    keep.write_text('ok café')
+    take.write_text('hi café')
+
+    ret = main([
+        '--mode', MODE_VISIBLE_PLUS,
+        '--files-include', '*.py',
+        '--files-exclude', '*.md',
+        str(keep), str(take),
+    ])
+
+    assert ret == 1
+    assert 'café' not in take.read_text()
+    assert keep.read_text() == 'ok café'
 
 
 def test_include_range_ignores_empty_parts(tmp_path):
