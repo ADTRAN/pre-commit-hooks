@@ -128,6 +128,12 @@
     entry: artifactory.adtran.com/docker/pre-commit-hooks:5.0.0-1 detect-private-key
     language: docker_image
     types: [text]
+-   id: detect-non-ascii-characters
+    name: detect non-ascii characters
+    description: detects non-ascii characters with support for multiple validation modes (balanced, visible-plus, ascii-only) and configurable byte ranges.
+    entry: detect-non-ascii-characters
+    language: python
+    types: [text]
 -   id: double-quote-string-fixer
     name: fix double quoted strings
     description: replaces double quoted strings with single quoted strings.

@@ -112,21 +112,96 @@ The following arguments are available:
 Checks for the existence of private keys.
 
 #### `detect-non-ascii-characters`
-Detects and strips non-printable, non-ASCII bytes (supply-chain safety guard).
-  - Modes (choose via `--mode`):
-    - `balanced` (default): allow ASCII + Latin-1 accents/symbols; block controls/null, bidi overrides (U+202A–U+202E, U+2066–U+2069), and zero-width characters (U+200B–U+200D).
-    - `visible-plus`: allow ASCII + emoji (U+1F600–U+1F64F and modifiers/VS16), still blocking zero-width joiners, bidi, and controls.
-    - `ascii-only`: allow only tab/lf/cr and `0x20-0x7E`; block everything else.
-    - Examples: `--mode balanced` (default); `--mode visible-plus` (allow 😀, 🚀, etc. but still block zero-width joiners); `--mode ascii-only` (paranoid mode, blocks all non-ASCII).
-  - `--include-range RANGE` - override allowed byte ranges (comma-separated, decimal or hex, supports `START-END`). Can be repeated.
-    - Examples: `--include-range 0x09,0x0A,0x0D,0x20-0x7E` (default printable ASCII); `--include-range 0-255` (allow all bytes); `--include-range 0x20-0x7E,0xA0` (allow NBSP too).
-  - `--allow-chars TEXT` - permit additional characters (adds their UTF-8 bytes to the allowed set). Can be repeated.
-    - Examples: `--allow-chars "é"` (allow a single accent); `--allow-chars "😀"` (allow an emoji); `--allow-chars "👨‍👩‍👧‍👦"` (allow a grapheme cluster with ZWJ).
-  - `--files-glob GLOB` - optional fnmatch-style glob to further restrict the provided file list (by default, the hook processes all files handed to it by pre-commit).
-    - Example: `--files-glob "*.py"` (only consider .py files from the passed list).
-  - `--files-include GLOB` / `--files-exclude GLOB` - additional fnmatch-style filters applied after `--files-glob`.
-    - Examples: `--files-include "*.md"` (only Markdown); `--files-exclude "vendor/*"` (skip vendored files).
-  - `--check-only` - report disallowed bytes without modifying files.
+Detects and fixes non-ASCII characters with supply-chain safety guards. Automatically skips binary files.
+
+**Default Behavior:** Checks files and reports issues without modifying them. Use `--fix` to remove problematic characters.
+
+- **Modes** (choose via `--mode`):
+
+  **All modes block these security threats:**
+  - Control characters (except tab/line feed/carriage return)
+  - Null bytes
+  - Bidi overrides (U+202A–U+202E, U+2066–U+2069)
+  - Non-breaking space (U+00A0)
+
+  **Mode-specific allowed characters:**
+
+  - `visible-plus`: Allow ASCII + emoji (😀🚀) + international scripts (Arabic, Hebrew, CJK, etc.) + emoji modifiers and zero-width joiners in emoji context only.
+
+  - `balanced` (default): Allow ASCII + Latin-1 accents/symbols (café, naïve, ©, ®) + Latin Extended-A (Polish, Czech, Hungarian). Block emoji and isolated zero-width characters.
+
+  - `ascii-only`: Allow only tab/LF/CR and printable ASCII (`0x20-0x7E`). Block everything else including accents and emoji.
+
+- `--fix` - Modify files to remove problematic characters (default is check-only, no modifications).
+  - In `ascii-only` mode: Accented letters are normalized to ASCII equivalents via NFD decomposition (é → e, ñ → n).
+  - Other modes: Problematic characters are removed entirely.
+
+- `--include-range RANGE` - Expand mode to also allow additional byte ranges (additive, not restrictive). Can be repeated.
+  - Format: Comma-separated decimal or hex values, supports `START-END` spans.
+  - Examples:
+    - `--include-range 0x09,0x0A,0x0D,0x20-0x7E` (ASCII printable + tab/LF/CR)
+    - `--include-range 0x20-0x7E,0xA0-0xFF` (ASCII + Latin-1 Supplement)
+  - Note: Specifying the full byte range (`0x00-0xFF`) will throw an error.
+  - Note: `--include-range` expands what the mode allows, it doesn't restrict it.
+
+- `--allow-chars TEXT` - Permit additional characters beyond what the mode allows. Can be repeated.
+  - The UTF-8 bytes of the specified text are added to the allowed set.
+  - Examples:
+    - `--allow-chars é` (allow single accented character)
+    - `--allow-chars café` (allow multiple characters)
+    - `--allow-chars 👨‍👩‍👧‍👦` (allow emoji with zero-width joiners)
+
+- `--file-include GLOB` - Include only files matching this fnmatch-style glob. Can be repeated.
+  - Example: `--file-include "*.py"` (check only Python files)
+  - Example: `--file-include "src/**/*.py"` (check only source files)
+  - Example: `--file-include "src/app.py" --file-include "docs/README.md"` (check two specific files)
+  - Example: `--file-include "src/app.py,src/app2.js"` (comma-separated list)
+
+- `--file-exclude GLOB` - Exclude files matching this fnmatch-style glob (applied last). Can be repeated.
+  - Example: `--file-exclude "vendor/*"` (skip vendored code)
+  - Example: `--file-exclude "*_test.py"` (skip test files)
+  - Example: `--file-exclude "build/*,dist/*"` (comma-separated list)
+
+**Examples:**
+
+```yaml
+# Strict ASCII-only, report issues without fixing
+- id: detect-non-ascii-characters
+  args: ['--mode', 'ascii-only']
+
+# Allow accents, remove security threats, modify files
+- id: detect-non-ascii-characters
+  args: ['--mode', 'balanced', '--fix']
+
+# Allow emojis, report without fixing
+- id: detect-non-ascii-characters
+  args: ['--mode', 'visible-plus']
+
+# Custom: allow French accents in code
+- id: detect-non-ascii-characters
+  args: ['--mode', 'ascii-only', '--allow-chars', 'éèêëàâäùûüôöçœæ', '--fix']
+
+# Check only Python files, expand Latin-1 support
+- id: detect-non-ascii-characters
+  args: ['--mode', 'balanced', '--include-range', '0x20-0x7E,0xA0-0xFF', '--file-include', '*.py']
+```
+
+**Output:**
+- Check mode (default): Reports issues with line/column numbers and character descriptions
+- Fix mode (`--fix`): Same report, but problematic characters are removed from files
+
+Example output:
+```
+Checking files/main.py...
+  Found 15 issues:
+  • 8 invisible/control characters (security risk)
+  • 7 other non-ASCII characters
+
+Line 5, Col 12: '<202E>' (U+202E) RIGHT-TO-LEFT OVERRIDE
+Line 8, Col 3: 'café' (U+00E9) LATIN SMALL LETTER E WITH ACUTE
+
+Summary: 1 files checked, 1 with issues, 15 total problems
+```
 
 #### `double-quote-string-fixer`
 This hook replaces double quoted strings with single quoted strings.
