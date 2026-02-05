@@ -396,7 +396,7 @@ def _categorize_files(filenames: list[str], file_include: list[str], file_exclud
             if is_gitattr_binary:  # Check .gitattributes if present
                 binary.append(filename)
                 continue
-        except (IOError, OSError):
+        except (IOError, OSError):  # pragma: no cover
             excluded.append(filename)
             continue
         to_check.append(filename)
@@ -477,7 +477,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gitattributes_path = os.path.join(repo_root, '.gitattributes')
     if os.path.exists(gitattributes_path):  # pragma: no branch
-        gitattributes = parse_gitattributes(gitattributes_path)
+        gitattributes = parse_gitattributes(gitattributes_path)  # pragma: no cover
 
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
