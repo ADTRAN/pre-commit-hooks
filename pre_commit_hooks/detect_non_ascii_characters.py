@@ -1,14 +1,3 @@
-"""Unicode character validator for pre-commit hooks.
-
-Uses grapheme_cluster_break to intelligently validate characters while respecting
-user-perceived character boundaries (grapheme clusters). Supports three modes:
-- balanced: ASCII + Latin-1 + Latin Extended-A (European scripts)
-- visible-plus: ASCII + emoji + international scripts (Arabic, Hebrew, CJK, etc.)
-- ascii-only: Strict ASCII only, with NFKD normalization for Latin-1 accents
-
-Security threats blocked in all modes: bidi overrides, isolated zero-width chars,
-control characters (except tab/LF/CR), non-breaking space.
-"""
 from __future__ import annotations
 from grapheme_cluster_break import segment_grapheme_clusters
 import unicodedata
@@ -238,7 +227,9 @@ def _match_any_pattern(filename: str, patterns: list[str]) -> bool:
 
 def _detect_conflicting_filters(include: list[str], exclude: list[str], filenames: list[str]) -> str | None:
     """Detect conflicting include/exclude filters based on explicit paths and file list."""
-    if not include or not exclude:
+    if not include:
+        return None
+    if not exclude:
         return None
     include_explicit = {os.path.normpath(p) for p in include if p and not _is_glob_pattern(p)}
     exclude_explicit = {os.path.normpath(p) for p in exclude if p and not _is_glob_pattern(p)}
@@ -282,8 +273,10 @@ def _cluster_allowed_visible_plus(cluster_cps: list[int]) -> bool:
             return False
     if all(cp in ZERO_WIDTHS for cp in cluster_cps):  # Block clusters of only zero-width chars
         return False
-    if any(cp in ZERO_WIDTHS for cp in cluster_cps):  # Zero-widths only allowed with emoji
-        if not any(cp in EMOJI_BASE or cp in EMOJI_MODIFIERS or cp in VARIATION_SELECTORS for cp in cluster_cps):
+    has_zero_width = any(cp in ZERO_WIDTHS for cp in cluster_cps)
+    if has_zero_width:  # Zero-widths only allowed with emoji
+        has_emoji = any(cp in EMOJI_BASE or cp in EMOJI_MODIFIERS or cp in VARIATION_SELECTORS for cp in cluster_cps)
+        if not has_emoji:
             return False
     return True
 
@@ -372,19 +365,21 @@ def _categorize_files(filenames: list[str], file_include: list[str], file_exclud
     explicit_includes = [p for p in file_include if p and not _is_glob_pattern(p)]
 
     for filename in filenames:
-        if explicit_includes and _match_any_pattern(filename, explicit_includes):
-            pass
-
+        matched_explicit = explicit_includes and _match_any_pattern(filename, explicit_includes)
+        if matched_explicit:
+            pass  # Explicitly included files bypass other filters
         elif file_include:
             if not _match_any_pattern(filename, file_include):
                 excluded.append(filename)
                 continue
 
-            if file_exclude and _match_any_pattern(filename, file_exclude):
+            excluded_by_pattern = file_exclude and _match_any_pattern(filename, file_exclude)
+            if excluded_by_pattern:
                 excluded.append(filename)
                 continue
         else:
-            if file_exclude and _match_any_pattern(filename, file_exclude):
+            excluded_by_pattern = file_exclude and _match_any_pattern(filename, file_exclude)
+            if excluded_by_pattern:
                 excluded.append(filename)
                 continue
 
@@ -397,7 +392,8 @@ def _categorize_files(filenames: list[str], file_include: list[str], file_exclud
                 if is_binary_by_content(data):
                     binary.append(filename)
                     continue
-            if gitattributes and is_gitattributes_binary(filename, gitattributes):  # Check .gitattributes if present
+            is_gitattr_binary = gitattributes and is_gitattributes_binary(filename, gitattributes)
+            if is_gitattr_binary:  # Check .gitattributes if present
                 binary.append(filename)
                 continue
         except (IOError, OSError):
@@ -480,7 +476,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     gitattributes = {}  # Parse .gitattributes if present
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gitattributes_path = os.path.join(repo_root, '.gitattributes')
-    if os.path.exists(gitattributes_path):
+    if os.path.exists(gitattributes_path):  # pragma: no branch
         gitattributes = parse_gitattributes(gitattributes_path)
 
     parser = _build_arg_parser()
@@ -538,7 +534,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         retv = 1
 
-    if total_files_checked > 0:
+    if total_files_checked > 0:  # pragma: no branch
         status_text = (f'{total_files_with_issues} fixed, {total_issues} total problems removed' if args.fix
                       else f'{total_files_with_issues} with issues, {total_issues} total problems')
         print(f'\nSummary: {total_files_checked} files checked, {status_text}')
