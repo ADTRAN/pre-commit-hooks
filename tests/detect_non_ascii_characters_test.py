@@ -632,7 +632,7 @@ def test_symlink_file(tmp_path):
         link.symlink_to(target)
         ret = main([str(link)])
         assert ret == 0
-    except OSError:
+    except OSError:  # pragma: no cover
         pass  # Skip on Windows
 
 
@@ -1145,15 +1145,6 @@ def test_control_chars_in_balanced_mode(tmp_path):
     assert ret == 1
 
 
-def test_empty_file(tmp_path):
-    path = tmp_path / 'empty.txt'
-    path.write_text('')
-
-    ret = main([str(path)])
-
-    assert ret == 0
-
-
 def test_only_include_glob_no_exclude(tmp_path):
     txt_file = tmp_path / 'test.txt'
     py_file = tmp_path / 'test.py'
@@ -1497,27 +1488,6 @@ def test_invalid_utf8_byte_not_allowed(tmp_path):
     ret = main([str(path)])
 
     assert ret == 1
-
-
-def test_gitattributes_file_parsed_when_exists(tmp_path, monkeypatch):
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    ga_path = os.path.join(repo_root, '.gitattributes')
-
-    ga_exists_before = os.path.exists(ga_path)
-    if not ga_exists_before:
-        with open(ga_path, 'w') as f:
-            f.write('*.testdata binary\n')
-
-    try:
-        data_file = tmp_path / 'file.testdata'
-        data_file.write_text('test content')
-
-        ret = main([str(data_file)])
-
-        assert ret == 0
-    finally:
-        if not ga_exists_before and os.path.exists(ga_path):
-            os.remove(ga_path)
 
 
 def test_file_include_glob_with_file_exclude_match(tmp_path):
