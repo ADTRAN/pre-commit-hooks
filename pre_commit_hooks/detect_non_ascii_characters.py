@@ -13,7 +13,22 @@ BINARY_DETECTION_BUFFER_SIZE = 4096  # Read first 4KB to detect binary files
 MODE_BALANCED, MODE_VISIBLE_PLUS, MODE_ASCII_ONLY = 'balanced', 'visible-plus', 'ascii-only'
 MODE_CHOICES = (MODE_BALANCED, MODE_VISIBLE_PLUS, MODE_ASCII_ONLY)
 DEFAULT_INCLUDE_RANGE = '0x09,0x0A,0x0D,0x20-0x7E'  # tab, LF, CR, space, printable ASCII (0x20-0x7E)
-
+ALLOWED_WHITESPACE = {0x09, 0x0A, 0x0D}  # tab, LF, CR
+MIN_BYTE_VALUE = 0x00
+MAX_BYTE_VALUE = 0xFF
+TOTAL_BYTE_VALUES = 0x100  # All possible byte values (0x00-0xFF)
+ASCII_MAX = 0x7F  # Maximum value for ASCII characters
+NON_ASCII_START = 0x80  # Start of non-ASCII range
+ASCII_LIMIT = 128  # Alias for ASCII_MAX
+FIRST_LINE = 1
+FIRST_COL = 1
+LINE_INCREMENT = 1
+COL_INCREMENT = 1
+MIN_DATA_LENGTH_FOR_RATIO = 1  # Prevents division by zero in UTF-8 validation
+LATIN1_ACCENTED_START = 0xC0
+LATIN1_ACCENTED_END = 0xFF
+LATIN_EXT_A_START = 0x0100
+LATIN_EXT_A_END = 0x017F
 
 # ASCII values correspond to:
 #   0x09 - horizontal tab, \t
@@ -28,7 +43,7 @@ DEFAULT_INCLUDE_RANGE = '0x09,0x0A,0x0D,0x20-0x7E'  # tab, LF, CR, space, printa
 #   0x61-0x7A - lowercase: a-z
 #   0x7B-0x7E - punctuation: { | } ~
 
-ASCII_BASE = {0x09, 0x0A, 0x0D} | set(range(0x20, 0x7F))  # tab/LF/CR + space-tilde (printable ASCII)
+ASCII_BASE = {0x09, 0x0A, 0x0D} | set(range(0x20, 0x7F))  # tab,LF,CR,space-tilde + printable ASCII
 LATIN1_VISIBLE = set(range(0xA0, 0x100))  # Latin-1 Supplement: é, ñ, ç, etc.
 LATIN_EXT_A = set(range(0x0100, 0x0180))  # Latin Extended-A: Polish, Czech, Hungarian, etc.
 CONTROL_C0 = set(range(0x00, 0x20))  # C0 controls (except tab, LF, CR which are in ASCII_BASE)
@@ -95,7 +110,18 @@ INVISIBLE_NAMES = {
     0x2069: 'POP DIRECTIONAL ISOLATE',
 }
 
-RED, CYAN, BOLD, RESET = '\033[31m', '\033[36m', '\033[1m', '\033[0m'  # ANSI color codes
+DELETE_CHAR = 0x7F  # Control character for DELETE
+NOBREAK_SPACE = 0xA0  # Non-breaking space (U+00A0)
+SPACE_BYTE = 0x20  # Space character
+EMOJI_EMOTICONS_START = 0x1F600  # Start of emoticons range
+EMOJI_EMOTICONS_END = 0x1FAFF  # End of emoticons range
+SURROGATE_ESCAPE_START = 0xDC80  # Start of surrogate escape range
+SURROGATE_ESCAPE_END = 0xDCFF  # End of surrogate escape range
+
+RED = '\033[31m'
+CYAN = '\033[36m'
+BOLD = '\033[1m'
+RESET = '\033[0m'
 
 
 def is_binary_extension(filename: str) -> bool:
@@ -118,8 +144,8 @@ def is_binary_by_content(data: bytes) -> bool:
         return False
     except UnicodeDecodeError:
         decoded = data.decode('utf-8', errors='surrogateescape')
-        surrogate_count = sum(1 for ch in decoded if 0xDC80 <= ord(ch) <= 0xDCFF)
-        return surrogate_count / max(1, len(data)) > MAX_INVALID_UTF8_RATIO
+        surrogate_count = sum(1 for ch in decoded if SURROGATE_ESCAPE_START <= ord(ch) <= SURROGATE_ESCAPE_END)
+        return surrogate_count / max(MIN_DATA_LENGTH_FOR_RATIO, len(data)) > MAX_INVALID_UTF8_RATIO
 
 
 def is_gitattributes_binary(filename: str, gitattributes: dict) -> bool:
@@ -137,15 +163,19 @@ def parse_gitattributes(path: str) -> dict:
     try:
         with open(path, 'r', encoding='utf-8') as f:
             for line in f:
-                if not (line := line.strip()) or line.startswith('#'): continue
+                if not (line := line.strip()) or line.startswith('#'):
+                    continue
                 parts = line.split()
                 attrmap = {}
                 for attr in parts[1:]:
-                    if attr.startswith('filter=lfs'): attrmap['filter'] = 'lfs'
-                    elif attr in ('binary', '-text'): attrmap['binary'] = True
-                    elif attr == 'text': attrmap['text'] = True
-                if attrmap: attrs[parts[0]] = attrmap
-    except Exception: pass
+                    if attr.startswith('filter=lfs'):
+                        attrmap['filter'] = 'lfs'
+                    elif attr in ('binary', '-text'):
+                        attrmap['binary'] = True
+                if parts and attrmap:
+                    attrs[parts[0]] = attrmap
+    except Exception:
+        pass
     return attrs
 
 
@@ -155,7 +185,7 @@ def _parse_byte(token: str, parser: argparse.ArgumentParser) -> int:
         value = int(token, base)
     except ValueError:
         parser.error(f'invalid byte value {token!r}')
-    if not 0 <= value <= 0xFF:
+    if not MIN_BYTE_VALUE <= value <= MAX_BYTE_VALUE:
         parser.error(f'byte value out of range: {token!r}')
     return value
 
@@ -164,8 +194,11 @@ def _parse_range_spec(spec: str, parser: argparse.ArgumentParser) -> set[int]:
     allowed = set()
     for part in (p.strip() for p in spec.split(',') if p.strip()):
         if '-' in part:
-            start, end = (_parse_byte(s, parser) for s in part.split('-', 1))
-            if start > end: parser.error(f'invalid range {part!r}: start > end')
+            range_values = [_parse_byte(s, parser) for s in part.split('-', 1)]
+            start = range_values[0]
+            end = range_values[1]
+            if start > end:
+                parser.error(f'invalid range {part!r}: start > end')
             allowed.update(range(start, end + 1))
         else:
             allowed.add(_parse_byte(part, parser))
@@ -179,7 +212,7 @@ def _build_allowed(args: argparse.Namespace, parser: argparse.ArgumentParser) ->
         allowed.update(_parse_range_spec(spec, parser))
     for extra in args.allow_chars:
         allowed.update(extra.encode())
-    if allowed == set(range(0x100)):
+    if allowed == set(range(TOTAL_BYTE_VALUES)):
         parser.error('include-range would allow all bytes (0x00-0xFF), effectively disabling the checker. '
                     'This configuration is not allowed. To enable the checker, use more restrictive byte ranges via --include-range and/or --allow-chars.')
     return allowed, bool(args.include_range)
@@ -253,23 +286,23 @@ def _detect_conflicting_filters(include: list[str], exclude: list[str], filename
 
 def _is_control_or_null(cp: int) -> bool:
     """Check if codepoint is a control character or null."""
-    return cp in CONTROL_C0 or cp in CONTROL_C1 or cp == 0x7F
+    return cp in CONTROL_C0 or cp in CONTROL_C1 or cp == DELETE_CHAR
 
 
 def _cluster_allowed_balanced(cluster_cps: list[int]) -> bool:
     """Check if cluster allowed in balanced mode (ASCII + Latin-1 + Latin Extended-A)."""
-    if any(cp in BIDI_OVERRIDES or cp in ZERO_WIDTHS or cp == 0x00A0 for cp in cluster_cps):
+    if any(cp in BIDI_OVERRIDES or cp in ZERO_WIDTHS or cp == NOBREAK_SPACE for cp in cluster_cps):
         return False
-    if any(_is_control_or_null(cp) and cp not in {0x09, 0x0A, 0x0D} for cp in cluster_cps):
+    if any(_is_control_or_null(cp) and cp not in ALLOWED_WHITESPACE for cp in cluster_cps):
         return False
     return all(cp in ASCII_BASE or cp in LATIN1_VISIBLE or cp in LATIN_EXT_A for cp in cluster_cps)
 
 def _cluster_allowed_visible_plus(cluster_cps: list[int]) -> bool:
     """Check if cluster allowed in visible-plus mode (ASCII + emoji + international scripts)."""
     for cp in cluster_cps:  # Block security threats
-        if cp == 0x00A0 or cp in BIDI_OVERRIDES:
+        if cp == NOBREAK_SPACE or cp in BIDI_OVERRIDES:
             return False
-        if _is_control_or_null(cp) and cp not in {0x09, 0x0A, 0x0D}:
+        if _is_control_or_null(cp) and cp not in ALLOWED_WHITESPACE:
             return False
     if all(cp in ZERO_WIDTHS for cp in cluster_cps):  # Block clusters of only zero-width chars
         return False
@@ -283,7 +316,7 @@ def _cluster_allowed_visible_plus(cluster_cps: list[int]) -> bool:
 
 def _cluster_allowed_ascii_only(cluster_cps: list[int]) -> bool:
     """Check if cluster allowed in ascii-only mode (strict ASCII)."""
-    return all(cp in ASCII_BASE for cp in cluster_cps) and 0x00A0 not in cluster_cps
+    return all(cp in ASCII_BASE for cp in cluster_cps) and NOBREAK_SPACE not in cluster_cps
 
 
 
@@ -291,11 +324,13 @@ def _cluster_allowed(cluster_bytes: bytes, cluster_text: str, allowed_bytes: set
                      mode: str, restrict_to_allowed_bytes: bool) -> bool:
     """Check if grapheme cluster is allowed based on mode and byte allowances."""
     cps = [ord(ch) for ch in cluster_text]
-    allowed_by_mode = (
-        _cluster_allowed_balanced(cps) if mode == MODE_BALANCED else
-        _cluster_allowed_visible_plus(cps) if mode == MODE_VISIBLE_PLUS else
-        _cluster_allowed_ascii_only(cps)
-    )
+    if mode == MODE_BALANCED:
+        allowed_by_mode = _cluster_allowed_balanced(cps)
+    elif mode == MODE_VISIBLE_PLUS:
+        allowed_by_mode = _cluster_allowed_visible_plus(cps)
+    else:
+        allowed_by_mode = _cluster_allowed_ascii_only(cps)
+
     if allowed_by_mode: # Allow if restrict_to_allowed_bytes is True and all bytes in allowed set (expansion/override)
         return True
 
@@ -304,8 +339,10 @@ def _cluster_allowed(cluster_bytes: bytes, cluster_text: str, allowed_bytes: set
 
 def _categorize_offender(cluster: str) -> str:
     """Categorize an offender as 'invisible', 'emoji', or 'other'."""
-    if all(ord(c) in INVISIBLE_NAMES for c in cluster): return 'invisible'
-    if any(0x1F600 <= ord(c) <= 0x1FAFF or ord(c) in EMOJI_BASE for c in cluster): return 'emoji'
+    if all(ord(c) in INVISIBLE_NAMES for c in cluster):
+        return 'invisible'
+    if any(EMOJI_EMOTICONS_START <= ord(c) <= EMOJI_EMOTICONS_END or ord(c) in EMOJI_BASE for c in cluster):
+        return 'emoji'
     return 'other'
 
 
@@ -314,7 +351,7 @@ def _format_cluster_safe(cluster: str) -> str:
     result = []
     for c in cluster:
         cp = ord(c)
-        result.append(f'<{cp:04X}>' if cp in INVISIBLE_NAMES or cp < 0x20 or cp == 0x7F or (0x80 <= cp < 0xA0) else c)
+        result.append(f'<{cp:04X}>' if cp in INVISIBLE_NAMES or cp < SPACE_BYTE or cp == ASCII_MAX or (NON_ASCII_START <= cp < NOBREAK_SPACE) else c)
     return ''.join(result)
 
 
@@ -322,10 +359,10 @@ def _get_problematic_codepoints(cluster: str) -> list[int]:
     """Identify which codepoints in the cluster are actually problematic (not innocent context)."""
     cps = [ord(c) for c in cluster]
     problematic = [cp for cp in cps if (
-        (cp in CONTROL_C0 and cp not in {0x09, 0x0A, 0x0D}) or
-        cp in CONTROL_C1 or cp == 0x7F or cp in BIDI_OVERRIDES or cp in ZERO_WIDTHS or cp == 0x00A0
+        (cp in CONTROL_C0 and cp not in ALLOWED_WHITESPACE) or
+        cp in CONTROL_C1 or cp == DELETE_CHAR or cp in BIDI_OVERRIDES or cp in ZERO_WIDTHS or cp == NOBREAK_SPACE
     )]
-    return problematic if problematic else [cp for cp in cps if cp >= 0x80] or cps
+    return problematic if problematic else [cp for cp in cps if cp >= NON_ASCII_START] or cps
 
 
 def _format_offenders(offenders: list[tuple[int, int, str]], text: str, fix_mode: bool = False) -> tuple[str, dict[str, int]]:
@@ -338,9 +375,12 @@ def _format_offenders(offenders: list[tuple[int, int, str]], text: str, fix_mode
     total = sum(counts_dict.values())
 
     summary = [f"{'Removed' if fix_mode else 'Found'} {total} {'problematic characters:' if fix_mode else 'issues:'}"]
-    if counts_dict['invisible']: summary.append(f"• {counts_dict['invisible']} invisible/control characters (security risk)")
-    if counts_dict['emoji']: summary.append(f"• {counts_dict['emoji']} emoji (blocked in balanced mode)")
-    if counts_dict['other']: summary.append(f"• {counts_dict['other']} other non-ASCII characters")
+    if counts_dict['invisible']:
+        summary.append(f"• {counts_dict['invisible']} invisible/control characters (security risk)")
+    if counts_dict['emoji']:
+        summary.append(f"• {counts_dict['emoji']} emoji (blocked in balanced mode)")
+    if counts_dict['other']:
+        summary.append(f"• {counts_dict['other']} other non-ASCII characters")
 
     lines = ['\n'.join(summary), '']
     for (cat, color) in [('invisible', RED), ('emoji', CYAN), ('other', BOLD)]:
@@ -360,7 +400,9 @@ def _format_offenders(offenders: list[tuple[int, int, str]], text: str, fix_mode
 def _categorize_files(filenames: list[str], file_include: list[str], file_exclude: list[str],
                       gitattributes: dict[str, dict[str, str]]) -> tuple[list[str], list[str], list[str]]:
     """Categorize files into: to_check, binary, excluded. """
-    to_check, binary, excluded = [], [], []
+    to_check = []
+    binary = []
+    excluded = []
 
     explicit_includes = [p for p in file_include if p and not _is_glob_pattern(p)]
 
@@ -396,7 +438,7 @@ def _categorize_files(filenames: list[str], file_include: list[str], file_exclud
             if is_gitattr_binary:  # Check .gitattributes if present
                 binary.append(filename)
                 continue
-        except (IOError, OSError):  # pragma: no cover
+        except (IOError, OSError):
             excluded.append(filename)
             continue
         to_check.append(filename)
@@ -432,14 +474,15 @@ def _process_single_file(filename: str, allowed: set[int], allowed_clusters: set
 
     offenders: list[tuple[int, int, str]] = []
     new_chunks: list[bytes] = []
-    line, col = 1, 1
+    line = FIRST_LINE
+    col = FIRST_COL
 
     if use_grapheme_clusters and orig_text is not None:
         for cluster in segment_grapheme_clusters(orig_text):
             if cluster in allowed_clusters:  # Always preserve explicitly allowed clusters
                 new_chunks.append(cluster.encode('utf-8'))
                 for ch in cluster:
-                    line, col = (line + 1, 1) if ch == '\n' else (line, col + 1)
+                    line, col = (line + 1, FIRST_COL) if ch == '\n' else (line, col + 1)
                 continue
             cluster_line, cluster_col = line, col
             cluster_bytes = cluster.encode('utf-8')
@@ -450,19 +493,19 @@ def _process_single_file(filename: str, allowed: set[int], allowed_clusters: set
                 offenders.append((cluster_line, cluster_col, cluster))
                 if fix_mode and mode == MODE_ASCII_ONLY and len(cluster) == 1:  # In ascii-only mode, replace Latin-1 or Latin Extended-A accented letters with ASCII equivalents
                     cp = ord(cluster)
-                    if (0xC0 <= cp <= 0xFF) or (0x0100 <= cp <= 0x017F):
+                    if (LATIN1_ACCENTED_START <= cp <= LATIN1_ACCENTED_END) or (LATIN_EXT_A_START <= cp <= LATIN_EXT_A_END):
                         decomp = unicodedata.normalize('NFKD', cluster)
-                        ascii_equiv = ''.join(c for c in decomp if ord(c) < 128)
+                        ascii_equiv = ''.join(c for c in decomp if ord(c) < ASCII_LIMIT)
                         if ascii_equiv:
                             new_chunks.append(ascii_equiv.encode('utf-8'))
                             continue
             for ch in cluster:  # Update line and column tracking
-                line, col = (line + 1, 1) if ch == '\n' else (line, col + 1)
+                line, col = (line + 1, FIRST_COL) if ch == '\n' else (line, col + 1)
     else:  # Fallback for invalid UTF-8: process byte by byte
         for byte_val in data:
-            if byte_val in allowed or byte_val in {0x09, 0x0A, 0x0D}:
+            if byte_val in allowed or byte_val in ALLOWED_WHITESPACE:
                 new_chunks.append(bytes([byte_val]))
-                line, col = (line + 1, 1) if byte_val == 0x0A else (line, col + 1)
+                line, col = (line + 1, FIRST_COL) if byte_val == 0x0A else (line, col + 1)
             else:
                 offenders.append((line, col, f'<{byte_val:02X}>'))
                 if not fix_mode:
@@ -473,11 +516,9 @@ def _process_single_file(filename: str, allowed: set[int], allowed_clusters: set
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    gitattributes = {}  # Parse .gitattributes if present
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     gitattributes_path = os.path.join(repo_root, '.gitattributes')
-    if os.path.exists(gitattributes_path):  # pragma: no branch
-        gitattributes = parse_gitattributes(gitattributes_path)  # pragma: no cover
+    gitattributes = parse_gitattributes(gitattributes_path)
 
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
@@ -534,10 +575,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         retv = 1
 
-    if total_files_checked > 0:  # pragma: no branch
-        status_text = (f'{total_files_with_issues} fixed, {total_issues} total problems removed' if args.fix
-                      else f'{total_files_with_issues} with issues, {total_issues} total problems')
-        print(f'\nSummary: {total_files_checked} files checked, {status_text}')
+    status_text = (f'{total_files_with_issues} fixed, {total_issues} total problems removed' if args.fix
+                  else f'{total_files_with_issues} with issues, {total_issues} total problems')
+    print(f'\nSummary: {total_files_checked} files checked, {status_text}')
 
     return retv
 
