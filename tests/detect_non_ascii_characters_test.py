@@ -1500,14 +1500,14 @@ def test_file_read_io_error_during_categorization(tmp_path):
 
     original_open = open
 
-    def open_side_effect(*args, **kwargs):
-        if 'rb' in str(args) and str(error_path) in str(args):
+    def open_side_effect(filename, *args, **kwargs):
+        mode = args[0] if args else kwargs.get('mode', 'r')
+        if mode == 'rb' and os.path.samefile(filename, error_path):
             raise IOError('Disk error')
-        return original_open(*args, **kwargs)
+        return original_open(filename, *args, **kwargs)
 
     with mock.patch('builtins.open', side_effect=open_side_effect):
         ret = main([str(error_path), str(ok_path)])
-
 
     assert ret == 0
 
@@ -1521,11 +1521,11 @@ def test_file_read_os_error_during_categorization(tmp_path):
 
     original_open = open
 
-    def open_side_effect(*args, **kwargs):
-
-        if 'rb' in str(args) and str(error_path) in str(args):
-            raise OSError('Permission denied')  # Only raise on the binary check read for the error file
-        return original_open(*args, **kwargs)
+    def open_side_effect(filename, *args, **kwargs):
+        mode = args[0] if args else kwargs.get('mode', 'r')
+        if mode == 'rb' and os.path.samefile(filename, error_path):
+            raise OSError('Permission denied')
+        return original_open(filename, *args, **kwargs)
 
     with mock.patch('builtins.open', side_effect=open_side_effect):
         ret = main([str(error_path), str(ok_path)])
