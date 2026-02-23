@@ -112,7 +112,7 @@ The following arguments are available:
 Checks for the existence of private keys.
 
 #### `detect-non-ascii-characters`
-Detects and fixes non-ASCII characters with supply-chain safety guards. Automatically skips binary files.
+Detects and fixes non-ASCII characters. Automatically skips binary files.
 
 **Default Behavior:** Checks files and reports issues without modifying them. Use `--fix` to remove problematic characters.
 
@@ -120,47 +120,63 @@ Detects and fixes non-ASCII characters with supply-chain safety guards. Automati
 
   **All modes block these security threats:**
   - Control characters (except tab/line feed/carriage return)
-  - Null bytes
-  - Bidi overrides (U+202A–U+202E, U+2066–U+2069)
+    - Null byte: U+0000
+    - Control characters: U+0001–U+001F, U+007F, U+0080–U+009F
+  - Bidi overrides:
+    - U+202A
+    - U+202B
+    - U+202C
+    - U+202D
+    - U+202E
+    - U+2066
+    - U+2067
+    - U+2068
+    - U+2069
+  - Zero-width characters:
+    - U+200B
+    - U+200C
+    - U+200D
   - Non-breaking space (U+00A0)
 
   **Mode-specific allowed characters:**
 
-  - `visible-plus`: Allow ASCII + emoji (😀🚀) + international scripts (Arabic, Hebrew, CJK, etc.) + emoji modifiers and zero-width joiners in emoji context only.
+  - `visible-plus`: Allow ASCII + emoji (😀🚀) + international scripts (Hindi, Hebrew, CJK, etc.) + emoji modifiers and zero-width joiners in emoji context only.
 
   - `balanced` (default): Allow ASCII + Latin-1 accents/symbols (café, naïve, ©, ®) + Latin Extended-A (Polish, Czech, Hungarian). Block emoji and isolated zero-width characters.
 
   - `ascii-only`: Allow only tab/LF/CR and printable ASCII (`0x20-0x7E`). Block everything else including accents and emoji.
 
-- `--fix` - Modify files to remove problematic characters (default is check-only, no modifications).
-  - In `ascii-only` mode: Accented letters are normalized to ASCII equivalents via NFD decomposition (é → e, ñ → n).
+- `--fix` - Modify files to remove problematic characters (hook is check-only by default).
+  - Note: In `ascii-only` mode: Accented letters are normalized to ASCII equivalents via NFD decomposition (é → e, ñ → n).
   - Other modes: Problematic characters are removed entirely.
 
 - `--include-range RANGE` - Expand mode to also allow additional byte ranges (additive, not restrictive). Can be repeated.
   - Format: Comma-separated decimal or hex values, supports `START-END` spans.
   - Examples:
-    - `--include-range 0x09,0x0A,0x0D,0x20-0x7E` (ASCII printable + tab/LF/CR)
-    - `--include-range 0x20-0x7E,0xA0-0xFF` (ASCII + Latin-1 Supplement)
+    - `args: [--include-range, '0x20-0x7E']` (explicitly allow basic ASCII)
+    - `args: [--include-range, '0x09,0x0A,0x0D,0x20-0x7E']` (explicitly allow ASCII + tab/LF/CR)
+    - `args: [--include-range, '0x20-0x7E', --include-range, '0xA0-0xFF']` (allow ASCII + Latin-1)
+    - `args: [--include-range, "['0x20-0x7E','0xA0-0xFF']"]`
+
   - Note: Specifying the full byte range (`0x00-0xFF`) will throw an error.
   - Note: `--include-range` expands what the mode allows, it doesn't restrict it.
 
 - `--allow-chars TEXT` - Permit additional characters beyond what the mode allows. Can be repeated.
   - The UTF-8 bytes of the specified text are added to the allowed set.
   - Examples:
-    - `--allow-chars é` (allow single accented character)
-    - `--allow-chars café` (allow multiple characters)
-    - `--allow-chars 👨‍👩‍👧‍👦` (allow emoji with zero-width joiners)
+    - `args: [--allow-chars, 'é']` (allow é in ascii-only mode)
+    - `args: [--allow-chars, 'ébç']` (allow multiple specific characters)
+    - `args: [--allow-chars, '😀,😆']` (allow multiple emojis)
+    - `args: [--allow-chars, "['💻','🚀','🍴']"]`
 
 - `--file-include GLOB` - Include only files matching this fnmatch-style glob. Can be repeated.
-  - Example: `--file-include "*.py"` (check only Python files)
-  - Example: `--file-include "src/**/*.py"` (check only source files)
-  - Example: `--file-include "src/app.py" --file-include "docs/README.md"` (check two specific files)
-  - Example: `--file-include "src/app.py,src/app2.js"` (comma-separated list)
+  - Examples:
+    - `args: [--file-include, '*.py']` (only check Python files)
+    - `args: [--file-include, 'src/app.py,src/app2.js']`
+    - `args: [--file-include, 'src/app.py', --file-include, 'docs/README.md']`
+    - `args: [--file-include, "['src/app.py','docs/README.md']"]`
 
 - `--file-exclude GLOB` - Exclude files matching this fnmatch-style glob (applied last). Can be repeated.
-  - Example: `--file-exclude "vendor/*"` (skip vendored code)
-  - Example: `--file-exclude "*_test.py"` (skip test files)
-  - Example: `--file-exclude "build/*,dist/*"` (comma-separated list)
 
 **Examples:**
 
@@ -184,24 +200,18 @@ Detects and fixes non-ASCII characters with supply-chain safety guards. Automati
 # Check only Python files, expand Latin-1 support
 - id: detect-non-ascii-characters
   args: ['--mode', 'balanced', '--include-range', '0x20-0x7E,0xA0-0xFF', '--file-include', '*.py']
+
+# Check all files in src/ except src/app2.js
+- id: detect-non-ascii-characters
+  args: ['--mode', 'ascii-only', '--fix', '--file-include', 'src/*', '--file-exclude', 'src/app2.js']
+
+
+
 ```
 
 **Output:**
 - Check mode (default): Reports issues with line/column numbers and character descriptions
 - Fix mode (`--fix`): Same report, but problematic characters are removed from files
-
-Example output:
-```
-Checking files/main.py...
-  Found 15 issues:
-  • 8 invisible/control characters (security risk)
-  • 7 other non-ASCII characters
-
-Line 5, Col 12: '<202E>' (U+202E) RIGHT-TO-LEFT OVERRIDE
-Line 8, Col 3: 'café' (U+00E9) LATIN SMALL LETTER E WITH ACUTE
-
-Summary: 1 files checked, 1 with issues, 15 total problems
-```
 
 #### `double-quote-string-fixer`
 This hook replaces double quoted strings with single quoted strings.
