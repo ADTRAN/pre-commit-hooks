@@ -1,3 +1,0 @@
-ASCII ok
-Has ctrl:
-Unicode: café
