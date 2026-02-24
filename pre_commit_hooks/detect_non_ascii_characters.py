@@ -345,7 +345,7 @@ def _detect_conflicting_filters(
     if glob_conflicts:
         return (
             f"Conflicting file filters: --file-include and --file-exclude both use "
-            f'"{sorted(glob_conflicts)[0]}". This would exclude all files.'
+            f'"{min(glob_conflicts)}". This would exclude all files.'
         )
 
     return None

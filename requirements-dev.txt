@@ -6,3 +6,4 @@ pytest
 ruamel.yaml>=0.15
 tomli>=1.1.0;python_version<"3.11"
 grapheme-cluster-break>=1.1.1
+binaryornot>=0.4.4
