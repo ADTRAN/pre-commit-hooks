@@ -960,7 +960,7 @@ def test_main_integration_multiple_files(tmp_path, case):
 )
 def test_main_error_scenarios(tmp_path, case):
     for arg in case["cli_args"]:
-        if arg.endswith(".txt"):
+        if arg.endswith(".txt") and arg.replace('.txt', '').isalnum():
             (tmp_path / arg).write_text("ok", encoding="utf-8")
     with pytest.raises(SystemExit) as exc_info:
         dna_hook.main(
@@ -1147,7 +1147,7 @@ def test_main_file_filtering_and_fix_mode(tmp_path, case):
 
 
 def test_main_conflict_error_truncation(tmp_path, capsys):
-    files = [str(tmp_path / f"f{i}.txt") for i in range(12)]
+    files = [str(tmp_path / f"f{i}_valid.txt") for i in range(12)]
     for f in files:
         Path(f).write_text("ok")
     include_csv = ",".join(files)
