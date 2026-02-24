@@ -960,7 +960,7 @@ def test_main_integration_multiple_files(tmp_path, case):
 )
 def test_main_error_scenarios(tmp_path, case):
     for arg in case["cli_args"]:
-        if arg.endswith(".txt") and arg.replace('.txt', '').isalnum():
+        if arg.endswith(".txt") and arg.replace(".txt", "").isalnum():
             (tmp_path / arg).write_text("ok", encoding="utf-8")
     with pytest.raises(SystemExit) as exc_info:
         dna_hook.main(

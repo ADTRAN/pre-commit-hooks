@@ -686,7 +686,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if len(files) > MAX_DISPLAY:
                     truncated = ", ".join(files[:MAX_DISPLAY]) + ", ..."
                     truncated_error = re.sub(
-                        r"list: (.+)\.", f"list: {truncated}.", conflict_error
+                        r"list: (.+)\.", lambda m: f"list: {truncated}.", conflict_error
                     )
                     print("\nCONFIGURATION ERROR\n" + truncated_error + "\n")
                 else:
