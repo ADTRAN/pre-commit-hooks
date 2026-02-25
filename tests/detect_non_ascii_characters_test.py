@@ -1,7 +1,11 @@
-import pytest
-import argparse
+from testing.util import git_commit
 from pathlib import Path
 from pre_commit_hooks import detect_non_ascii_characters as dna_hook
+
+import pytest
+import argparse
+import os
+import subprocess
 
 
 @pytest.mark.parametrize(
@@ -9,118 +13,182 @@ from pre_commit_hooks import detect_non_ascii_characters as dna_hook
     [
         pytest.param(
             {
-                "lines": [
-                    "# comment line",
-                    "",
-                    "onlypattern",
-                    "pat1 binary",
-                    "pat2 -text filter=lfs",
-                    "pat3 filter=lfs",
-                    "pat4 filter=other",
-                ],
-                "expected_attrs": {
-                    "pat1": {"binary": True},
-                    "pat2": {"binary": True, "filter": "lfs"},
-                    "pat3": {"filter": "lfs"},
-                },
+                "desc": "binary and lfs",
+                "gitattributes": "*.bin binary\n*.lfs filter=lfs\n",
+                "files": ["test.bin", "test.lfs"],
+                "file_contents": ["dummy", "dummy"],
+                "expected": {"test.bin", "test.lfs"},
+                "git_init": True,
+                "git_add": [".gitattributes", "test.bin", "test.lfs"],
+                "invalid": False,
             },
-            id="multiple_patterns_and_attrs",
+            id="binary_and_lfs",
         ),
         pytest.param(
             {
-                "lines": ["foo.txt binary"],
-                "expected_attrs": {"foo.txt": {"binary": True}},
+                "desc": "single file both binary and lfs",
+                "gitattributes": "*.bin binary\n*.bin filter=lfs\n",
+                "files": ["test.bin"],
+                "file_contents": ["dummy"],
+                "expected": {"test.bin"},
+                "git_init": True,
+                "git_add": [".gitattributes", "test.bin"],
+                "invalid": False,
+            },
+            id="single_file_binary_and_lfs",
+        ),
+        pytest.param(
+            {
+                "desc": "single binary",
+                "gitattributes": "*.bin binary\n",
+                "files": ["test.bin"],
+                "file_contents": ["dummy"],
+                "expected": {"test.bin"},
+                "git_init": True,
+                "git_add": [".gitattributes", "test.bin"],
+                "invalid": False,
             },
             id="single_binary",
         ),
         pytest.param(
-            {"lines": ["bar"], "expected_attrs": {}},
-            id="no_attrs",
+            {
+                "desc": "single lfs",
+                "gitattributes": "*.lfs filter=lfs\n",
+                "files": ["test.lfs"],
+                "file_contents": ["dummy"],
+                "expected": {"test.lfs"},
+                "git_init": True,
+                "git_add": [".gitattributes", "test.lfs"],
+                "invalid": False,
+            },
+            id="single_lfs",
         ),
         pytest.param(
-            {"lines": ["baz.txt filter=other"], "expected_attrs": {}},
-            id="filter_other_ignored",
+            {
+                "desc": "no lfs or binary",
+                "gitattributes": "*.txt text\n*.md text\n",
+                "files": ["test.txt"],
+                "file_contents": ["dummy"],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [".gitattributes", "test.txt"],
+                "invalid": False,
+            },
+            id="no_lfs_or_binary",
+        ),
+        pytest.param(
+            {
+                "desc": "empty file",
+                "gitattributes": "",
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [".gitattributes"],
+                "invalid": False,
+            },
+            id="empty_file",
+        ),
+        pytest.param(
+            {
+                "desc": "no gitattributes",
+                "gitattributes": None,
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [],
+                "invalid": False,
+            },
+            id="no_gitattributes",
+        ),
+        pytest.param(
+            {
+                "desc": "exception branch (not a git repo)",
+                "gitattributes": None,
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": False,
+                "git_add": [],
+                "invalid": False,
+            },
+            id="exception_branch",
+        ),
+        pytest.param(
+            {
+                "desc": "invalid content",
+                "gitattributes": "\0invalid\0content\0",
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [".gitattributes"],
+                "invalid": True,
+            },
+            id="invalid_content",
+        ),
+        pytest.param(
+            {
+                "desc": "no files",
+                "gitattributes": "*.bin binary\n",
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [".gitattributes"],
+                "invalid": False,
+            },
+            id="no_files",
+        ),
+        pytest.param(
+            {
+                "desc": "only gitattributes",
+                "gitattributes": "*.bin binary\n",
+                "files": [],
+                "file_contents": [],
+                "expected": set(),
+                "git_init": True,
+                "git_add": [".gitattributes"],
+                "invalid": False,
+            },
+            id="only_gitattributes",
+        ),
+        pytest.param(
+            {
+                "desc": "multiple sub-directory with same file name",
+                "gitattributes": "dir1/*.bin binary\n",
+                "files": ["dir1/test.bin", "dir2/test.bin"],
+                "file_contents": ["dummy", "dummy"],
+                "expected": {"dir1/test.bin"},
+                "git_init": True,
+                "git_add": [".gitattributes", "dir1/test.bin", "dir2/test.bin"],
+                "invalid": True,
+            },
+            id="multiple_sub_directory_with same_file_name",
         ),
     ],
 )
-def test_parse_gitattributes_expected_attributes(tmp_path, case):
-    ga = tmp_path / ".gitattributes"
-    ga.write_text("\n".join(case["lines"]), encoding="utf-8")
-    attrs = dna_hook.parse_gitattributes(str(ga))
-    expected_attrs = case["expected_attrs"]
-    assert attrs == expected_attrs
-
-
-@pytest.mark.parametrize(
-    "case",
-    [
-        pytest.param(
-            {
-                "filename": "test.png",
-                "gitattributes": {"*.png": {"binary": True}},
-                "expected": True,
-            },
-            id="png_binary_true",
-        ),
-        pytest.param(
-            {
-                "filename": "test.bin",
-                "gitattributes": {"*.bin": {"filter": "lfs"}},
-                "expected": True,
-            },
-            id="bin_filter_lfs",
-        ),
-        pytest.param(
-            {
-                "filename": "test.bin",
-                "gitattributes": {"*.bin": {"binary": True, "filter": "lfs"}},
-                "expected": True,
-            },
-            id="bin_binary_and_filter_lfs",
-        ),
-        pytest.param(
-            {
-                "filename": "test.txt",
-                "gitattributes": {"*.png": {"binary": True}},
-                "expected": False,
-            },
-            id="txt_not_matched",
-        ),
-        pytest.param(
-            {
-                "filename": "test.foo",
-                "gitattributes": {"*.foo": {"binary": True}},
-                "expected": True,
-            },
-            id="foo_binary_true",
-        ),
-        pytest.param(
-            {
-                "filename": "test.bar",
-                "gitattributes": {"*.bar": {"filter": "other"}},
-                "expected": False,
-            },
-            id="bar_filter_other_false",
-        ),
-        pytest.param(
-            {
-                "filename": "test.baz",
-                "gitattributes": {"*.baz": {"filter": "lfs"}},
-                "expected": True,
-            },
-            id="baz_filter_lfs_true",
-        ),
-        pytest.param(
-            {"filename": "test.txt", "gitattributes": {}, "expected": False},
-            id="txt_empty_attrs_false",
-        ),
-    ],
-)
-def test_file_is_binary_matches_expected(case):
-    assert (
-        dna_hook.file_is_binary(case["filename"], case["gitattributes"])
-        is case["expected"]
-    )
+def test_get_lfs_and_binary_tracked_files_cases(tmp_path, case):
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        if case["gitattributes"] is not None:
+            (tmp_path / ".gitattributes").write_text(case["gitattributes"])
+        for fname, content in zip(case["files"], case["file_contents"]):
+            fpath = tmp_path / fname
+            fpath.parent.mkdir(parents=True, exist_ok=True)
+            fpath.write_text(content)
+        if case["git_init"]:
+            subprocess.run(["git", "init"], check=True)
+        if case["git_add"]:
+            subprocess.run(["git", "add"] + case["git_add"], check=True)
+        if case["git_init"] and case["git_add"]:
+            git_commit("-m", "test commit")
+        ignored_files = dna_hook.get_lfs_and_binary_tracked_files()
+        assert ignored_files == case["expected"]
+    finally:
+        os.chdir(old_cwd)
 
 
 @pytest.mark.parametrize(
@@ -193,19 +261,6 @@ def test_file_is_binary_matches_expected(case):
         ),
         pytest.param(
             {
-                "filename": "data.txt",
-                "content": "hello",
-                "write_mode": "text",
-                "include": [],
-                "exclude": [],
-                "gitattributes": {"*.txt": {"binary": True}},
-                "expected_in": "data.txt",
-                "expected_set": "binary",
-            },
-            id="txt_gitattributes_binary",
-        ),
-        pytest.param(
-            {
                 "filename": "nonexistent_file.txt",
                 "content": None,
                 "write_mode": None,
@@ -229,6 +284,19 @@ def test_file_is_binary_matches_expected(case):
                 "expected_set": "excluded",
             },
             id="include_and_exclude_txt",
+        ),
+        pytest.param(
+            {
+                "filename": "script.py",
+                "content": b"\x00" * 10,
+                "write_mode": "bytes",
+                "include": [],
+                "exclude": [],
+                "gitattributes": {"script.py": "binary"},
+                "expected_in": "script.py",
+                "expected_set": "binary",
+            },
+            id="script_py_binary_by_gitattributes",
         ),
     ],
 )

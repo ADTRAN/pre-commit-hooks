@@ -2,12 +2,15 @@ from __future__ import annotations
 from grapheme_cluster_break import segment_grapheme_clusters
 from binaryornot.check import is_binary
 from pathlib import Path, PurePath
+from pre_commit_hooks.util import zsplit
 from collections.abc import Sequence
 
 import unicodedata
 import argparse
 import sys
 import re
+import subprocess
+
 
 BINARY_DETECTION_BUFFER_SIZE = 4096  # Read first 4KB to detect binary files
 
@@ -152,62 +155,48 @@ class SilentArgumentParser(argparse.ArgumentParser):
         sys.exit(2)
 
 
-def file_is_binary(filename: str, gitattributes: dict) -> bool:
+def file_is_binary(filename: str, ignored_files: set) -> bool:
     """Determine if a file should be treated as binary."""
 
-    if is_binary(filename):  # Check by content/extension
+    if (filename in ignored_files) or is_binary(filename):
         return True
-
-    for pattern, attrs in gitattributes.items():  # Check by .gitattributes
-        if PurePath(filename).match(pattern):
-            if attrs.get("filter") == "lfs" or attrs.get("binary"):
-                return True
     return False
 
 
-def parse_gitattributes(path: str) -> dict:
-    attrs = {}
+def get_lfs_and_binary_tracked_files() -> set:
+    """Get files tracked by git-lfs and binary files based on gitattributes."""
+    result = set()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
+        ls_files = subprocess.run(  # Get all tracked files in the repo
+            ("git", "ls-files", "-z"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+            check=True,
+        )
+        filenames = zsplit(ls_files.stdout)
+        if not filenames:
+            return result
 
-                parts = line.split(
-                    None, 1
-                )  # Split on first whitespace only to handle filenames with spaces
+        check_attr = subprocess.run(  # Check attributes for all tracked files to find those with filter=lfs or binary
+            ("git", "check-attr", "filter", "binary", "-z", "--stdin"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            encoding="utf-8",
+            check=True,
+            input="\0".join(filenames),
+        )
+        stdout = zsplit(check_attr.stdout)
 
-                if len(parts) < 2:
-                    continue
-
-                pattern, attrs_str = parts
-
-                has_binary = (
-                    False  # Parse attributes - both 'binary' and 'lfs' can coexist
-                )
-                has_lfs = False
-
-                for attr in attrs_str.split():
-                    if attr == "binary" or attr == "-text":
-                        has_binary = True
-                    if attr.startswith("filter="):
-                        filter_val = attr.split("=", 1)[1]
-                        if filter_val == "lfs":
-                            has_lfs = True
-
-                if (
-                    has_binary or has_lfs
-                ):  # Store if any relevant attributes found (they're not mutually exclusive)
-                    attrs[pattern] = {}
-                    if has_binary:
-                        attrs[pattern]["binary"] = True
-                    if has_lfs:
-                        attrs[pattern]["filter"] = "lfs"
-
+        for i in range(0, len(stdout), 3):
+            filename, attr, value = stdout[i], stdout[i + 1], stdout[i + 2]
+            if (attr == "filter" and value == "lfs") or (
+                attr == "binary" and value == "set"
+            ):
+                result.add(filename)
     except Exception:
         pass
-    return attrs
+    return result
 
 
 def _parse_byte(token: str, parser: argparse.ArgumentParser) -> int:
@@ -495,7 +484,7 @@ def _categorize_files(
     filenames: list[str],
     file_include: list[str],
     file_exclude: list[str],
-    gitattributes: dict[str, dict[str, str]],
+    ignored_files: set[str],
 ) -> tuple[list[str], list[str], list[str]]:
     """Categorize files into: to_check, binary, excluded."""
 
@@ -536,7 +525,7 @@ def _categorize_files(
 
         try:  # Read file to check by content
             data = Path(filename).read_bytes()[:BINARY_DETECTION_BUFFER_SIZE]
-            if file_is_binary(filename, gitattributes):
+            if file_is_binary(filename, ignored_files):
                 binary.append(filename)
                 continue
         except (IOError, OSError):
@@ -659,9 +648,7 @@ def _normalize_multi_value_args(arg_list):
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    repo_root = Path(__file__).parent.parent
-    gitattributes_path = repo_root / ".gitattributes"
-    gitattributes = parse_gitattributes(str(gitattributes_path))
+    ignored_files = get_lfs_and_binary_tracked_files()
 
     parser = _build_arg_parser()
     try:
@@ -698,7 +685,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.exit(2)
 
     files_to_check, binary_files, excluded_files = _categorize_files(
-        list(args.filenames), args.file_include, args.file_exclude, gitattributes
+        list(args.filenames), args.file_include, args.file_exclude, ignored_files
     )
     allowed, restrict_to_includes, extra_clusters = _build_allowed(args, parser)
     allowed_clusters = set()
