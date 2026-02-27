@@ -167,6 +167,19 @@ import subprocess
             },
             id="multiple_sub_directory_with same_file_name",
         ),
+        pytest.param(
+            {
+                "desc": "single -text file",
+                "gitattributes": "test.png -text\n",
+                "files": ["test.png"],
+                "file_contents": ["dummy"],
+                "expected": {"test.png"},
+                "git_init": True,
+                "git_add": [".gitattributes", "test.png"],
+                "invalid": False,
+            },
+            id="single_-text_file",
+        ),
     ],
 )
 def test_get_lfs_and_binary_tracked_files_cases(tmp_path, case):

@@ -178,8 +178,8 @@ def get_lfs_and_binary_tracked_files() -> set:
         if not filenames:
             return result
 
-        check_attr = subprocess.run(  # Check attributes for all tracked files to find those with filter=lfs or binary
-            ("git", "check-attr", "filter", "binary", "-z", "--stdin"),
+        check_attr = subprocess.run(  # Check attributes for all tracked files to find those with filter=lfs/binary/text
+            ("git", "check-attr", "filter", "binary", "text", "-z", "--stdin"),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             encoding="utf-8",
@@ -190,8 +190,10 @@ def get_lfs_and_binary_tracked_files() -> set:
 
         for i in range(0, len(stdout), 3):
             filename, attr, value = stdout[i], stdout[i + 1], stdout[i + 2]
-            if (attr == "filter" and value == "lfs") or (
-                attr == "binary" and value == "set"
+            if (
+                (attr == "filter" and value == "lfs")
+                or (attr == "binary" and value == "set")
+                or (attr == "text" and value == "unset")
             ):
                 result.add(filename)
     except Exception:
