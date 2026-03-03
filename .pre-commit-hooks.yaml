@@ -220,6 +220,5 @@
 -   id: detect-non-ascii-characters
     name: detect non-ascii characters
     description: detects non-ascii characters with support for multiple validation modes (balanced, visible-plus, ascii-only) and configurable byte ranges.
-    entry: detect-non-ascii-characters
-    language: python
-    types: [text]
+    entry: artifactory.adtran.com/docker/pre-commit-hooks:5.0.0-2 detect-non-ascii-characters
+    language: docker_image
