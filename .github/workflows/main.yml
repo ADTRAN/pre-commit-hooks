@@ -17,3 +17,9 @@ jobs:
     with:
       env: '["py39", "py310", "py311", "py312"]'
       os: ubuntu-latest
+  # No single version of tox.yml supports py39 through py314
+  main-linux-new:
+    uses: asottile/workflows/.github/workflows/tox.yml@v1.12.0
+    with:
+      env: '["py313", "py314"]'
+      os: ubuntu-latest
