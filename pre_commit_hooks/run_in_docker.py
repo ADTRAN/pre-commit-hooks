@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Adapted from pre-commit's languages/docker.py to mount the working directory
 # and the main .git dir at their own paths, so git worktrees work
 from __future__ import annotations

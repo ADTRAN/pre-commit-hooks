@@ -16,7 +16,6 @@ from pre_commit_hooks.util import cmd_output
 from testing.util import git_commit
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(REPO_DIR, 'pre_commit_hooks', 'run_in_docker.py')
 CONTAINER_ID = '0123456789abcdef' * 4
 USER_ARGS = ('-u', '1000:1001')
 INSPECT_OUTPUT = json.dumps([{
@@ -253,23 +252,16 @@ def test_main(
 
 # Hook config
 
-@skip_win32  # pragma: win32 no cover
-def test_script_is_executable():
-    assert os.access(SCRIPT, os.X_OK)
-
-
 def load_hooks():
     with open(os.path.join(REPO_DIR, '.pre-commit-hooks.yaml')) as f:
         return yaml.load(f)
 
 
-def test_docker_hooks_use_script():
+def test_docker_hooks_use_run_in_docker():
     for hook in load_hooks():
         if hook['language'] != 'fail':
-            assert hook['language'] == 'script'
-            assert hook['entry'].startswith(
-                'pre_commit_hooks/run_in_docker.py ',
-            )
+            assert hook['language'] == 'python'
+            assert hook['entry'].startswith('run-in-docker ')
 
 
 def test_hooks_use_image_matching_version():

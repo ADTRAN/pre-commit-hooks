@@ -9,7 +9,7 @@ Some out-of-the-box hooks for pre-commit.
 See also: https://github.com/pre-commit/pre-commit
 
 This is a fork of https://github.com/pre-commit/pre-commit-hooks modified for build reproducibility.
-Docker hooks run through `pre_commit_hooks/run_in_docker.py` (Linux only) so they work in git worktrees.
+Docker hooks run through `run-in-docker` (Linux only) so they work in git worktrees.
 
 ### Using pre-commit-hooks with pre-commit
 
