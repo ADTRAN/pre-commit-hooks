@@ -139,6 +139,23 @@ def test_get_docker_path(
     assert run_in_docker._get_docker_path(path) == expected
 
 
+# TTY
+
+@skip_win32  # pragma: win32 no cover
+@pytest.mark.parametrize(
+    ('isatty', 'expected'),
+    (
+        pytest.param(True, ('--tty',), id='color'),
+        pytest.param(False, (), id='no-color'),
+    ),
+)
+@patch.object(sys, 'stdout')
+def test_get_docker_tty(mock_stdout, isatty, expected):
+    mock_stdout.isatty.return_value = isatty
+
+    assert run_in_docker.get_docker_tty() == expected
+
+
 # User
 
 @skip_win32  # pragma: win32 no cover
@@ -210,9 +227,10 @@ def fake_docker_path(path):  # pragma: win32 no cover
 )
 @patch.object(run_in_docker, '_get_docker_path', side_effect=fake_docker_path)
 @patch.object(run_in_docker, 'get_docker_user', return_value=USER_ARGS)
+@patch.object(run_in_docker, 'get_docker_tty', return_value=('--tty',))
 def test_main(
-        mock_get_docker_user, mock_get_docker_path, request, repo_fixture,
-        temp_git_dir,
+        mock_get_docker_tty, mock_get_docker_user, mock_get_docker_path,
+        request, repo_fixture, temp_git_dir,
 ):
     repo = request.getfixturevalue(repo_fixture)
     repo_dir = os.path.realpath(repo)
@@ -225,7 +243,7 @@ def test_main(
 
     assert ret == 0
     mock_call.assert_called_once_with((
-        'docker', 'run', '--rm', *USER_ARGS,
+        'docker', 'run', '--rm', '--tty', *USER_ARGS,
         '-v', f'/host{repo_dir}:{repo_dir}:rw,Z',
         '-v', f'/host{git_dir}:{git_dir}:rw,Z',
         '--workdir', repo_dir,

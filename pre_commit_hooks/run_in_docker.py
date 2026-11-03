@@ -96,12 +96,18 @@ def _get_git_common_dir() -> str:  # pragma: win32 no cover
     return os.path.realpath(out.strip())
 
 
+def get_docker_tty() -> tuple[str, ...]:  # pragma: win32 no cover
+    # pre-commit runs hooks in a pseudo-terminal when color is on
+    return (('--tty',) if sys.stdout.isatty() else ())
+
+
 def docker_cmd() -> tuple[str, ...]:  # pragma: win32 no cover
     cwd = os.getcwd()
     git_common_dir = _get_git_common_dir()
     return (
         'docker', 'run',
         '--rm',
+        *get_docker_tty(),
         *get_docker_user(),
         # https://docs.docker.com/engine/reference/commandline/run/#mount-volumes-from-container-volumes-from
         # The `Z` option tells Docker to label the content with a private
