@@ -7,3 +7,5 @@ tox -e py39 -- -vvl
 tox -e py310 -- -vvl
 tox -e py311 -- -vvl
 tox -e py312 -- -vvl
+tox -e py313 -- -vvl
+tox -e py314 -- -vvl

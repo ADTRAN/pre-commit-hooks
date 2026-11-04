@@ -1,3 +1,24 @@
+5.0.0.3 - 2026-11-03
+====================
+
+### Features
+
+- Docker hooks work in git worktrees and with rootless docker/podman
+- Docker hooks work when pre-commit runs in a container that uses the host's docker
+- Use `pre-commit-hooks:5.0.0-3` docker image for all hooks
+
+### Migrating
+
+- Windows is no longer supported by the docker hooks
+
+5.0.0.2 - 2026-03-03
+====================
+
+### Features
+
+- Add Adtran-specific `detect-non-ascii-characters` hook
+- Use `pre-commit-hooks:5.0.0-2` docker image for all hooks
+
 5.0.0.1 - 2025-03-24
 ====================
 
